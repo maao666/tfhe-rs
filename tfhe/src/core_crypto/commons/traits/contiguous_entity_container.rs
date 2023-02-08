@@ -82,12 +82,19 @@ pub trait ContiguousEntityContainer: AsRef<[Self::Element]> {
     /// Provide the size of a single [`Self::EntityView`].
     fn get_entity_view_pod_size(&self) -> usize;
 
+    /// Return the number of entities in the [`ContiguousEntityContainer`]
+    fn entity_count(&self) -> usize {
+        let entity_view_pod_size = self.get_entity_view_pod_size();
+        let entity_count = self.as_ref().len() / entity_view_pod_size;
+        entity_count
+    }
+
     /// Return an iterator borrowing immutably from the current contiguous container which returns
     /// [`Self::EntityView`] entities.
     fn iter(&self) -> WrappingLendingIterator<'_, Self::Element, Self::EntityView<'_>> {
         let meta = self.get_entity_view_creation_metadata();
+        let entity_count = self.entity_count();
         let entity_view_pod_size = self.get_entity_view_pod_size();
-        let entity_count = self.as_ref().len() / entity_view_pod_size;
         self.as_ref()
             .chunks(entity_view_pod_size)
             .zip(itertools::repeat_n(meta, entity_count))
@@ -123,19 +130,28 @@ pub trait ContiguousEntityContainer: AsRef<[Self::Element]> {
         Self::EntityView::<'_>::create_from(&self.as_ref()[start..stop], meta)
     }
 
+    fn last(&self) -> Option<Self::EntityView<'_>> {
+        let entity_count = self.entity_count();
+
+        if entity_count == 0 {
+            None
+        } else {
+            Some(self.get(entity_count - 1))
+        }
+    }
+
     fn chunks_exact(
         &self,
         chunk_size: usize,
     ) -> WrappingLendingIterator<'_, Self::Element, Self::SelfView<'_>> {
-        let entity_view_pod_size = self.get_entity_view_pod_size();
-
-        let entity_count = self.as_ref().len() / entity_view_pod_size;
+        let entity_count = self.entity_count();
         assert!(
             entity_count % chunk_size == 0,
             "The current container has {entity_count} entities, which is not dividable by the \
             requested chunk_size: {chunk_size}, preventing chunks_exact from returning an iterator."
         );
 
+        let entity_view_pod_size = self.get_entity_view_pod_size();
         let pod_chunk_size = entity_view_pod_size * chunk_size;
 
         let meta = self.get_self_view_creation_metadata();
@@ -154,8 +170,8 @@ pub trait ContiguousEntityContainer: AsRef<[Self::Element]> {
         Self::EntityViewMetadata: Send,
     {
         let meta = self.get_entity_view_creation_metadata();
+        let entity_count = self.entity_count();
         let entity_view_pod_size = self.get_entity_view_pod_size();
-        let entity_count = self.as_ref().len() / entity_view_pod_size;
         self.as_ref()
             .par_chunks(entity_view_pod_size)
             .zip(rayon::iter::repeatn(meta, entity_count))
@@ -191,8 +207,8 @@ pub trait ContiguousEntityContainerMut: ContiguousEntityContainer + AsMut<[Self:
         &mut self,
     ) -> WrappingLendingIteratorMut<'_, Self::Element, Self::EntityMutView<'_>> {
         let meta = self.get_entity_view_creation_metadata();
+        let entity_count = self.entity_count();
         let entity_view_pod_size = self.get_entity_view_pod_size();
-        let entity_count = self.as_ref().len() / entity_view_pod_size;
         self.as_mut()
             .chunks_mut(entity_view_pod_size)
             .zip(itertools::repeat_n(meta, entity_count))
@@ -225,13 +241,21 @@ pub trait ContiguousEntityContainerMut: ContiguousEntityContainer + AsMut<[Self:
         Self::EntityMutView::<'_>::create_from(&mut self.as_mut()[start..stop], meta)
     }
 
+    fn last_mut(&mut self) -> Option<Self::EntityMutView<'_>> {
+        let entity_count = self.entity_count();
+
+        if entity_count == 0 {
+            None
+        } else {
+            Some(self.get_mut(entity_count - 1))
+        }
+    }
+
     fn chunks_exact_mut(
         &mut self,
         chunk_size: usize,
     ) -> WrappingLendingIteratorMut<'_, Self::Element, Self::SelfMutView<'_>> {
-        let entity_view_pod_size = self.get_entity_view_pod_size();
-
-        let entity_count = self.as_ref().len() / entity_view_pod_size;
+        let entity_count = self.entity_count();
         assert!(
             entity_count % chunk_size == 0,
             "The current container has {entity_count} entities, which is not dividable by the \
@@ -239,6 +263,7 @@ pub trait ContiguousEntityContainerMut: ContiguousEntityContainer + AsMut<[Self:
             iterator."
         );
 
+        let entity_view_pod_size = self.get_entity_view_pod_size();
         let pod_chunk_size = entity_view_pod_size * chunk_size;
 
         let meta = self.get_self_view_creation_metadata();
@@ -257,8 +282,8 @@ pub trait ContiguousEntityContainerMut: ContiguousEntityContainer + AsMut<[Self:
         Self::EntityViewMetadata: Send,
     {
         let meta = self.get_entity_view_creation_metadata();
+        let entity_count = self.entity_count();
         let entity_view_pod_size = self.get_entity_view_pod_size();
-        let entity_count = self.as_ref().len() / entity_view_pod_size;
         self.as_mut()
             .par_chunks_mut(entity_view_pod_size)
             .zip(rayon::iter::repeatn(meta, entity_count))
