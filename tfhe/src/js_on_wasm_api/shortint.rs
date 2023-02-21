@@ -6,11 +6,11 @@ use super::js_wasm_seeder;
 use std::panic::set_hook;
 
 #[wasm_bindgen]
-pub struct ShortintCiphertext(pub(crate) crate::shortint::ciphertext::Ciphertext);
+pub struct ShortintCiphertext(pub(crate) crate::shortint::ciphertext::CiphertextBig);
 
 #[wasm_bindgen]
 pub struct ShortintCompressedCiphertext(
-    pub(crate) crate::shortint::ciphertext::CompressedCiphertext,
+    pub(crate) crate::shortint::ciphertext::CompressedCiphertextBig,
 );
 
 #[wasm_bindgen]

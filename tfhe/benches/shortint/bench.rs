@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use tfhe::shortint::keycache::NamedParam;
 use tfhe::shortint::parameters::*;
-use tfhe::shortint::{Ciphertext, Parameters, ServerKey};
+use tfhe::shortint::{CiphertextBig, Parameters, ServerKey};
 
 use rand::Rng;
 use tfhe::shortint::keycache::KEY_CACHE;
@@ -40,7 +40,7 @@ fn bench_server_key_unary_function<F>(
     unary_op: F,
     params: &[Parameters],
 ) where
-    F: Fn(&ServerKey, &mut Ciphertext),
+    F: Fn(&ServerKey, &mut CiphertextBig),
 {
     let mut bench_group = c.benchmark_group(bench_name);
 
@@ -73,7 +73,7 @@ fn bench_server_key_binary_function<F>(
     binary_op: F,
     params: &[Parameters],
 ) where
-    F: Fn(&ServerKey, &mut Ciphertext, &mut Ciphertext),
+    F: Fn(&ServerKey, &mut CiphertextBig, &mut CiphertextBig),
 {
     let mut bench_group = c.benchmark_group(bench_name);
 
@@ -108,7 +108,7 @@ fn bench_server_key_binary_scalar_function<F>(
     binary_op: F,
     params: &[Parameters],
 ) where
-    F: Fn(&ServerKey, &mut Ciphertext, u8),
+    F: Fn(&ServerKey, &mut CiphertextBig, u8),
 {
     let mut bench_group = c.benchmark_group(bench_name);
 
@@ -142,7 +142,7 @@ fn bench_server_key_binary_scalar_division_function<F>(
     binary_op: F,
     params: &[Parameters],
 ) where
-    F: Fn(&ServerKey, &mut Ciphertext, u8),
+    F: Fn(&ServerKey, &mut CiphertextBig, u8),
 {
     let mut bench_group = c.benchmark_group(bench_name);
 
@@ -221,7 +221,7 @@ fn programmable_bootstrapping(c: &mut Criterion) {
 
         bench_group.bench_function(&id, |b| {
             b.iter(|| {
-                sks.keyswitch_programmable_bootstrap(&ctxt, &acc);
+                sks.apply_lookup_table(&ctxt, &acc);
             })
         });
     }

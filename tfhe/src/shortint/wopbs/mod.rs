@@ -10,7 +10,7 @@
 use crate::core_crypto::commons::parameters::*;
 use crate::core_crypto::entities::*;
 use crate::shortint::engine::ShortintEngine;
-use crate::shortint::{Ciphertext, ClientKey, Parameters, ServerKey};
+use crate::shortint::{CiphertextBig, ClientKey, Parameters, ServerKey};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
@@ -95,7 +95,7 @@ impl WopbsKey {
     /// let res = cks.decrypt(&ct_res);
     /// assert_eq!(res, (m * m) % message_modulus);
     /// ```
-    pub fn generate_lut<F>(&self, ct: &Ciphertext, f: F) -> Vec<u64>
+    pub fn generate_lut<F>(&self, ct: &CiphertextBig, f: F) -> Vec<u64>
     where
         F: Fn(u64) -> u64,
     {
@@ -134,7 +134,7 @@ impl WopbsKey {
     /// let res = cks.decrypt_without_padding(&ct_res);
     /// assert_eq!(res, (m * m) % message_modulus);
     /// ```
-    pub fn generate_lut_without_padding<F>(&self, ct: &Ciphertext, f: F) -> Vec<u64>
+    pub fn generate_lut_without_padding<F>(&self, ct: &CiphertextBig, f: F) -> Vec<u64>
     where
         F: Fn(u64) -> u64,
     {
@@ -172,7 +172,7 @@ impl WopbsKey {
     /// let res = cks.decrypt_message_native_crt(&ct_res, message_modulus);
     /// assert_eq!(res, (m * m) % message_modulus as u64);
     /// ```
-    pub fn generate_lut_native_crt<F>(&self, ct: &Ciphertext, f: F) -> Vec<u64>
+    pub fn generate_lut_native_crt<F>(&self, ct: &CiphertextBig, f: F) -> Vec<u64>
     where
         F: Fn(u64) -> u64,
     {
@@ -217,9 +217,9 @@ impl WopbsKey {
     pub fn programmable_bootstrapping(
         &self,
         sks: &ServerKey,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBig,
         lut: &[u64],
-    ) -> Ciphertext {
+    ) -> CiphertextBig {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine
                 .programmable_bootstrapping(self, sks, ct_in, lut)
@@ -252,7 +252,7 @@ impl WopbsKey {
     /// let res = cks.decrypt_message_and_carry(&ct_res);
     /// assert_eq!(res, 1);
     /// ```
-    pub fn wopbs(&self, ct_in: &Ciphertext, lut: &[u64]) -> Ciphertext {
+    pub fn wopbs(&self, ct_in: &CiphertextBig, lut: &[u64]) -> CiphertextBig {
         ShortintEngine::with_thread_local_mut(|engine| engine.wopbs(self, ct_in, lut).unwrap())
     }
 
@@ -278,9 +278,9 @@ impl WopbsKey {
     /// ```
     pub fn programmable_bootstrapping_without_padding(
         &self,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBig,
         lut: &[u64],
-    ) -> Ciphertext {
+    ) -> CiphertextBig {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine
                 .programmable_bootstrapping_without_padding(self, ct_in, lut)
@@ -310,9 +310,9 @@ impl WopbsKey {
     /// ```
     pub fn programmable_bootstrapping_native_crt(
         &self,
-        ct_in: &mut Ciphertext,
+        ct_in: &mut CiphertextBig,
         lut: &[u64],
-    ) -> Ciphertext {
+    ) -> CiphertextBig {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine
                 .programmable_bootstrapping_native_crt(self, ct_in, lut)
@@ -326,7 +326,7 @@ impl WopbsKey {
     pub fn extract_bits(
         &self,
         delta_log: DeltaLog,
-        ciphertext: &Ciphertext,
+        ciphertext: &CiphertextBig,
         num_bits_to_extract: usize,
     ) -> LweCiphertextListOwned<u64> {
         ShortintEngine::with_thread_local_mut(|engine| {
@@ -354,14 +354,18 @@ impl WopbsKey {
         })
     }
 
-    pub fn keyswitch_to_wopbs_params(&self, sks: &ServerKey, ct_in: &Ciphertext) -> Ciphertext {
+    pub fn keyswitch_to_wopbs_params(
+        &self,
+        sks: &ServerKey,
+        ct_in: &CiphertextBig,
+    ) -> CiphertextBig {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine.keyswitch_to_wopbs_params(sks, self, ct_in)
         })
         .unwrap()
     }
 
-    pub fn keyswitch_to_pbs_params(&self, ct_in: &Ciphertext) -> Ciphertext {
+    pub fn keyswitch_to_pbs_params(&self, ct_in: &CiphertextBig) -> CiphertextBig {
         ShortintEngine::with_thread_local_mut(|engine| engine.keyswitch_to_pbs_params(self, ct_in))
             .unwrap()
     }
