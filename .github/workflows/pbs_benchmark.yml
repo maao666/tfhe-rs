@@ -1,5 +1,5 @@
-# Run shortint benchmarks on an AWS instance and return parsed results to Slab CI bot.
-name: Shortint benchmarks
+# Run PBS benchmarks on an AWS instance and return parsed results to Slab CI bot.
+name: PBS benchmarks
 
 on:
   workflow_dispatch:
@@ -19,9 +19,6 @@ on:
       request_id:
         description: 'Slab request ID'
         type: string
-      matrix_item:
-        description: 'Build matrix item'
-        type: string
 
 
 env:
@@ -29,8 +26,8 @@ env:
   RESULTS_FILENAME: parsed_benchmark_results_${{ github.sha }}.json
 
 jobs:
-  run-shortint-benchmarks:
-    name: Execute shortint benchmarks in EC2
+  run-pbs-benchmarks:
+    name: Execute PBS benchmarks in EC2
     runs-on: ${{ github.event.inputs.runner_name }}
     if: ${{ !cancelled() }}
     steps:
@@ -40,7 +37,6 @@ jobs:
           echo "AMI: ${{ inputs.instance_image_id }}"
           echo "Type: ${{ inputs.instance_type }}"
           echo "Request ID: ${{ inputs.request_id }}"
-          echo "Matrix item: ${{ inputs.matrix_item }}"
 
       - name: Get benchmark date
         run: |
@@ -62,9 +58,9 @@ jobs:
           toolchain: nightly
           override: true
 
-      - name: Run benchmarks
+      - name: Run benchmarks with AVX512
         run: |
-          make bench_shortint
+          make AVX512_SUPPORT=ON bench_pbs
 
       - name: Parse results
         run: |
@@ -77,40 +73,13 @@ jobs:
           --branch ${{ github.ref_name }} \
           --commit-date "${COMMIT_DATE}" \
           --bench-date "${{ env.BENCH_DATE }}" \
-          --walk-subdirs \
-          --throughput
-
-      - name: Remove previous raw results
-        run: |
-          rm -rf target/criterion
-
-      - name: Run benchmarks with AVX512
-        run: |
-          make AVX512_SUPPORT=ON bench_shortint
-
-      - name: Parse AVX512 results
-        run: |
-          python3 ./ci/benchmark_parser.py target/criterion ${{ env.RESULTS_FILENAME }} \
-          --hardware ${{ inputs.instance_type }} \
-          --walk-subdirs \
           --name-suffix avx512 \
-          --throughput \
-          --append-results
-
-      - name: Measure key sizes
-        run: |
-          make measure_shortint_key_sizes
-
-      - name: Parse key sizes results
-        run: |
-          python3 ./ci/benchmark_parser.py tfhe/shortint_key_sizes.csv ${{ env.RESULTS_FILENAME }} \
-          --key-sizes \
-          --append-results
+          --throughput
 
       - name: Upload parsed results artifact
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
         with:
-          name: ${{ github.sha }}_shortint
+          name: ${{ github.sha }}_pbs
           path: ${{ env.RESULTS_FILENAME }}
 
       - name: Checkout Slab repo
