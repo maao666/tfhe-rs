@@ -24,7 +24,7 @@ pub struct TensorSignedDecompositionLendingIter<'buffers, Scalar: UnsignedIntege
 
 impl<'buffers, Scalar: UnsignedInteger> TensorSignedDecompositionLendingIter<'buffers, Scalar> {
     #[inline]
-    pub(crate) fn new(
+    pub fn new(
         input: impl Iterator<Item = Scalar>,
         base_log: DecompositionBaseLog,
         level: DecompositionLevelCount,

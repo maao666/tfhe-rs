@@ -25,6 +25,7 @@ impl<A: IntoIterator> ZipChecked for A {}
 
 // https://docs.rs/itertools/0.7.8/src/itertools/lib.rs.html#247-269
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! izip {
     // eg. __izip_closure!(((a, b), c) => (a, b, c) , dd , ee )
     (@ __closure @ $p:pat => $tup:expr) => {
@@ -55,4 +56,5 @@ macro_rules! izip {
 }
 
 #[allow(unused_imports)]
-pub(crate) use izip;
+#[macro_export]
+pub use izip;

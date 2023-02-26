@@ -11,8 +11,8 @@ pub struct SignedDecomposer<Scalar>
 where
     Scalar: UnsignedInteger,
 {
-    pub(crate) base_log: usize,
-    pub(crate) level_count: usize,
+    pub base_log: usize,
+    pub level_count: usize,
     integer_type: PhantomData<Scalar>,
 }
 
