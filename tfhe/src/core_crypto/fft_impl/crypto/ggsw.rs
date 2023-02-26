@@ -455,7 +455,7 @@ pub fn add_external_product_assign<Scalar, InputGlweCont>(
 }
 
 #[cfg_attr(__profiling, inline(never))]
-fn collect_next_term<'a, Scalar: UnsignedTorus>(
+pub fn collect_next_term<'a, Scalar: UnsignedTorus>(
     decomposition: &mut TensorSignedDecompositionLendingIter<'_, Scalar>,
     substack1: &'a mut DynStack,
     align: usize,
@@ -630,7 +630,7 @@ unsafe fn update_with_fmadd_scalar(
 ///
 ///  - if `is_output_uninit` is false, `output_fourier` must not hold any uninitialized values.
 #[cfg_attr(__profiling, inline(never))]
-unsafe fn update_with_fmadd(
+pub unsafe fn update_with_fmadd(
     output_fft_buffer: &mut [MaybeUninit<c64>],
     ggsw_row: FourierGgswLevelRowView,
     fourier: &[c64],
