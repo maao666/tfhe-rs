@@ -56,5 +56,4 @@ macro_rules! izip {
 }
 
 #[allow(unused_imports)]
-#[macro_export]
 pub use izip;

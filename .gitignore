@@ -7,3 +7,4 @@ keys/
 
 **/Cargo.lock
 **/*.bin
+**/.DS_Store

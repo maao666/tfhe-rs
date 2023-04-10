@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::mem::{align_of, size_of, MaybeUninit};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use rug::Complex;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod x86;
@@ -212,19 +213,33 @@ fn convert_forward_integer_scalar<Scalar: UnsignedTorus>(
     in_im: &[Scalar],
     twisties: TwistiesView<'_>,
 ) {
+    let twist_prec:u32 = env!("TWISTPREC").parse().expect("$TWISTPREC must be a u32");
     izip!(out, in_re, in_im, twisties.re, twisties.im).for_each(
         |(out, in_re, in_im, w_re, w_im)| {
             let in_re: f64 = in_re.into_signed().cast_into();
             let in_im: f64 = in_im.into_signed().cast_into();
-            out.write(
-                c64 {
-                    re: in_re,
-                    im: in_im,
-                } * c64 {
-                    re: *w_re,
-                    im: *w_im,
-                },
-            );
+
+            let w: c64 = c64{re: *w_re, im: *w_im};
+            let in_: c64 = c64{re: in_re, im: in_im};
+            let rug_lhs = Complex::with_val(twist_prec, (w.re, w.im));
+            let rug_rhs = Complex::with_val(twist_prec, (in_.re, in_.im));
+            let rug_result = rug_lhs * rug_rhs;
+
+            let floats = rug_result.clone().into_real_imag();
+            let c64_result = c64::new(floats.0.to_f64(), floats.1.to_f64());
+            // if in_re != 0.0{
+            //     dbg!(in_re, in_im);
+            // }
+            out.write(c64_result);
+            // out.write(
+            //     c64 {
+            //         re: in_re,
+            //         im: in_im,
+            //     } * c64 {
+            //         re: *w_re,
+            //         im: *w_im,
+            //     },
+            // );
         },
     );
 }
