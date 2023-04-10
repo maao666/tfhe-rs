@@ -240,7 +240,7 @@ fn convert_forward_integer_scalar<Scalar: UnsignedTorus>(
             // if in_re != 0.0{
             //     dbg!(in_re, in_im);
             // }
-            out.write(c64_result);
+            *out = c64_result;
             // out.write(
             //     c64 {
             //         re: in_re,

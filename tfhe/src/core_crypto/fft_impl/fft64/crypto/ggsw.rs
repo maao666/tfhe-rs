@@ -605,7 +605,7 @@ unsafe fn update_with_fmadd_scalar(
 }
 
 #[cfg_attr(__profiling, inline(never))]
-pub(crate) fn update_with_fmadd(
+pub fn update_with_fmadd(
     output_fft_buffer: &mut [c64],
     lhs_polynomial_list: &[c64],
     fourier: &[c64],
