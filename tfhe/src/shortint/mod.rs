@@ -30,7 +30,7 @@
 //! use tfhe::shortint::{gen_keys, Parameters};
 //!
 //! // We generate a set of client/server keys, using the default parameters:
-//! let (mut client_key, mut server_key) = gen_keys(Parameters::default());
+//! let (mut client_key, mut server_key) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
 //!
 //! let msg1 = 1;
 //! let msg2 = 0;
@@ -58,10 +58,16 @@ pub mod server_key;
 #[cfg(not(feature = "__wasm_api"))]
 pub mod wopbs;
 
-pub use ciphertext::{Ciphertext, CompressedCiphertext};
+pub use ciphertext::{
+    CiphertextBase, CiphertextBig, CiphertextSmall, CompressedCiphertextBase,
+    CompressedCiphertextBig, CompressedCiphertextSmall, PBSOrder, PBSOrderMarker,
+};
 pub use client_key::ClientKey;
 pub use parameters::Parameters;
-pub use public_key::{CompressedPublicKey, PublicKey};
+pub use public_key::{
+    CompressedPublicKeyBase, CompressedPublicKeyBig, CompressedPublicKeySmall, PublicKeyBase,
+    PublicKeyBig, PublicKeySmall,
+};
 pub use server_key::{CheckError, CompressedServerKey, ServerKey};
 
 /// Generate a couple of client and server keys.
@@ -72,9 +78,10 @@ pub use server_key::{CheckError, CompressedServerKey, ServerKey};
 ///
 /// ```rust
 /// use tfhe::shortint::gen_keys;
+/// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
 ///
 /// // generate the client key and the server key:
-/// let (cks, sks) = gen_keys(Default::default());
+/// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
 /// ```
 pub fn gen_keys(parameters_set: Parameters) -> (ClientKey, ServerKey) {
     let cks = ClientKey::new(parameters_set);

@@ -30,9 +30,9 @@ on:
         type: string
 
 jobs:
-  shortint-tests:
+  integer-tests:
     concurrency:
-      group: ${{ github.ref }}_${{ github.event.inputs.instance_image_id }}_${{ github.event.inputs.instance_type }}
+      group: ${{ github.workflow }}_${{ github.ref }}_${{ github.event.inputs.instance_image_id }}_${{ github.event.inputs.instance_type }}
       cancel-in-progress: true
     runs-on: ${{ github.event.inputs.runner_name }}
     steps:
@@ -44,7 +44,7 @@ jobs:
           echo "Type: ${{ github.event.inputs.instance_type }}"
           echo "Request ID: ${{ github.event.inputs.request_id }}"
 
-      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+      - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3
 
       - name: Set up home
         run: |
@@ -56,9 +56,13 @@ jobs:
           toolchain: stable
           default: true
 
+      - name: Gen Keys if required
+        run: |
+          make gen_key_cache
+
       - name: Run integer tests
         run: |
-          make test_integer_ci
+          BIG_TESTS_INSTANCE=TRUE make test_integer_ci
 
       - name: Slack Notification
         if: ${{ always() }}
@@ -68,6 +72,6 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           SLACK_ICON: https://pbs.twimg.com/profile_images/1274014582265298945/OjBKP9kn_400x400.png
-          SLACK_MESSAGE: "Shortint tests finished with status: ${{ job.status }}. (${{ env.ACTION_RUN_URL }})"
+          SLACK_MESSAGE: "Integer tests finished with status: ${{ job.status }}. (${{ env.ACTION_RUN_URL }})"
           SLACK_USERNAME: ${{ secrets.BOT_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}

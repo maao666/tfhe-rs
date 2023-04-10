@@ -5,16 +5,18 @@ use crate::core_crypto::commons::computation_buffers::ComputationBuffers;
 use crate::core_crypto::commons::parameters::*;
 use crate::core_crypto::commons::traits::*;
 use crate::core_crypto::entities::*;
-use crate::core_crypto::fft_impl::crypto::bootstrap::{bootstrap_scratch, FourierLweBootstrapKey};
-use crate::core_crypto::fft_impl::crypto::ggsw::{
+use crate::core_crypto::fft_impl::fft64::crypto::bootstrap::{
+    bootstrap_scratch, FourierLweBootstrapKey,
+};
+use crate::core_crypto::fft_impl::fft64::crypto::ggsw::{
     add_external_product_assign as impl_add_external_product_assign,
     add_external_product_assign_scratch as impl_add_external_product_assign_scratch, cmux,
     cmux_scratch, FourierGgswCiphertext,
 };
-use crate::core_crypto::fft_impl::crypto::wop_pbs::blind_rotate_assign_scratch;
-use crate::core_crypto::fft_impl::math::fft::{Fft, FftView};
+use crate::core_crypto::fft_impl::fft64::crypto::wop_pbs::blind_rotate_assign_scratch;
+use crate::core_crypto::fft_impl::fft64::math::fft::{Fft, FftView};
 use concrete_fft::c64;
-use dyn_stack::{DynStack, SizeOverflow, StackReq};
+use dyn_stack::{PodStack, SizeOverflow, StackReq};
 
 /// Perform a blind rotation given an input [`LWE ciphertext`](`LweCiphertext`), modifying a look-up
 /// table passed as a [`GLWE ciphertext`](`GlweCiphertext`) and an [`LWE bootstrap
@@ -242,14 +244,14 @@ pub fn blind_rotate_assign<Scalar, InputCont, OutputCont, KeyCont>(
 }
 
 /// Memory optimized version of [`blind_rotate_assign`], the caller must provide
-/// a properly configured [`FftView`] object and a `DynStack` used as a memory buffer having a
+/// a properly configured [`FftView`] object and a `PodStack` used as a memory buffer having a
 /// capacity at least as large as the result of [`blind_rotate_assign_mem_optimized_requirement`].
 pub fn blind_rotate_assign_mem_optimized<Scalar, InputCont, OutputCont, KeyCont>(
     input: &LweCiphertext<InputCont>,
     lut: &mut GlweCiphertext<OutputCont>,
     fourier_bsk: &FourierLweBootstrapKey<KeyCont>,
     fft: FftView<'_>,
-    stack: DynStack<'_>,
+    stack: PodStack<'_>,
 ) where
     // CastInto required for PBS modulus switch which returns a usize
     Scalar: UnsignedTorus + CastInto<usize>,
@@ -309,7 +311,7 @@ pub fn add_external_product_assign<Scalar, OutputGlweCont, InputGlweCont, GgswCo
 }
 
 /// Memory optimized version of [`add_external_product_assign`], the caller must provide a properly
-/// configured [`FftView`] object and a `DynStack` used as a memory buffer having a capacity at
+/// configured [`FftView`] object and a `PodStack` used as a memory buffer having a capacity at
 /// least as large as the result of [`add_external_product_assign_mem_optimized_requirement`].
 ///
 /// Compute the external product of `ggsw` and `glwe`, and add the result to `out`.
@@ -362,7 +364,7 @@ pub fn add_external_product_assign<Scalar, OutputGlweCont, InputGlweCont, GgswCo
 ///     decomp_level_count,
 /// );
 ///
-/// encrypt_ggsw_ciphertext(
+/// encrypt_constant_ggsw_ciphertext(
 ///     &glwe_secret_key,
 ///     &mut ggsw,
 ///     msg_ggsw,
@@ -450,7 +452,7 @@ pub fn add_external_product_assign_mem_optimized<Scalar, OutputGlweCont, InputGl
     ggsw: &FourierGgswCiphertext<GgswCont>,
     glwe: &GlweCiphertext<InputGlweCont>,
     fft: FftView<'_>,
-    stack: DynStack<'_>,
+    stack: PodStack<'_>,
 ) where
     Scalar: UnsignedTorus,
     OutputGlweCont: ContainerMut<Element = Scalar>,
@@ -532,7 +534,7 @@ pub fn cmux_assign<Scalar, Cont0, Cont1, GgswCont>(
 }
 
 /// Memory optimized version of [`cmux_assign`], the caller must provide a properly configured
-/// [`FftView`] object and a `DynStack` used as a memory buffer having a capacity at least as large
+/// [`FftView`] object and a `PodStack` used as a memory buffer having a capacity at least as large
 /// as the result of [`cmux_assign_mem_optimized_requirement`].
 ///
 /// # Example
@@ -575,7 +577,7 @@ pub fn cmux_assign<Scalar, Cont0, Cont1, GgswCont>(
 ///     decomp_level_count,
 /// );
 ///
-/// encrypt_ggsw_ciphertext(
+/// encrypt_constant_ggsw_ciphertext(
 ///     &glwe_secret_key,
 ///     &mut ggsw_0,
 ///     msg_ggsw_0,
@@ -595,7 +597,7 @@ pub fn cmux_assign<Scalar, Cont0, Cont1, GgswCont>(
 ///     decomp_level_count,
 /// );
 ///
-/// encrypt_ggsw_ciphertext(
+/// encrypt_constant_ggsw_ciphertext(
 ///     &glwe_secret_key,
 ///     &mut ggsw_1,
 ///     msg_ggsw_1,
@@ -717,7 +719,7 @@ pub fn cmux_assign_mem_optimized<Scalar, Cont0, Cont1, GgswCont>(
     ct1: &mut GlweCiphertext<Cont1>,
     ggsw: &FourierGgswCiphertext<GgswCont>,
     fft: FftView<'_>,
-    stack: DynStack<'_>,
+    stack: PodStack<'_>,
 ) where
     Scalar: UnsignedTorus,
     Cont0: ContainerMut<Element = Scalar>,
@@ -918,7 +920,7 @@ pub fn cmux_assign_mem_optimized_requirement<Scalar>(
 /// let pbs_multipliation_plaintext: Plaintext<u64> =
 ///     decrypt_lwe_ciphertext(&big_lwe_sk, &pbs_multiplication_ct);
 ///
-/// /// // Create a SignedDecomposer to perform the rounding of the decrypted plaintext
+/// // Create a SignedDecomposer to perform the rounding of the decrypted plaintext
 /// // We pass a DecompositionBaseLog of 5 and a DecompositionLevelCount of 1 indicating we want to
 /// // round the 5 MSB, 1 bit of padding plus our 4 bits of message
 /// let signed_decomposer =
@@ -975,7 +977,7 @@ pub fn programmable_bootstrap_lwe_ciphertext<Scalar, InputCont, OutputCont, AccC
 }
 
 /// Memory optimized version of [`programmable_bootstrap_lwe_ciphertext`], the caller must provide
-/// a properly configured [`FftView`] object and a `DynStack` used as a memory buffer having a
+/// a properly configured [`FftView`] object and a `PodStack` used as a memory buffer having a
 /// capacity at least as large as the result of
 /// [`programmable_bootstrap_lwe_ciphertext_mem_optimized_requirement`].
 pub fn programmable_bootstrap_lwe_ciphertext_mem_optimized<
@@ -990,7 +992,7 @@ pub fn programmable_bootstrap_lwe_ciphertext_mem_optimized<
     accumulator: &GlweCiphertext<AccCont>,
     fourier_bsk: &FourierLweBootstrapKey<KeyCont>,
     fft: FftView<'_>,
-    stack: DynStack<'_>,
+    stack: PodStack<'_>,
 ) where
     // CastInto required for PBS modulus switch which returns a usize
     Scalar: UnsignedTorus + CastInto<usize>,

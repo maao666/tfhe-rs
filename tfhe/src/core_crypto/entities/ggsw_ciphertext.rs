@@ -192,14 +192,34 @@ pub fn ggsw_level_matrix_size(glwe_size: GlweSize, polynomial_size: PolynomialSi
     glwe_size.0 * glwe_size.0 * polynomial_size.0
 }
 
+/// Return the number of elements in a [`FourierGgswCiphertext`] given a [`GlweSize`],
+/// [`FourierPolynomialSize`] and [`DecompositionLevelCount`].
+pub fn fourier_ggsw_ciphertext_size(
+    glwe_size: GlweSize,
+    fourier_polynomial_size: FourierPolynomialSize,
+    decomp_level_count: DecompositionLevelCount,
+) -> usize {
+    decomp_level_count.0 * fourier_ggsw_level_matrix_size(glwe_size, fourier_polynomial_size)
+}
+
+/// Return the number of elements in a [`FourierGgswLevelMatrix`] given a [`GlweSize`] and
+/// [`FourierPolynomialSize`].
+pub fn fourier_ggsw_level_matrix_size(
+    glwe_size: GlweSize,
+    fourier_polynomial_size: FourierPolynomialSize,
+) -> usize {
+    glwe_size.0 * glwe_size.0 * fourier_polynomial_size.0
+}
+
 impl<Scalar, C: Container<Element = Scalar>> GgswCiphertext<C> {
     /// Create a [`GgswCiphertext`] from an existing container.
     ///
     /// # Note
     ///
     /// This function only wraps a container in the appropriate type. If you want to encrypt data
-    /// you need to use [`crate::core_crypto::algorithms::encrypt_ggsw_ciphertext`] or its parallel
-    /// counterpart [`crate::core_crypto::algorithms::par_encrypt_ggsw_ciphertext`] using
+    /// you need to use [`crate::core_crypto::algorithms::encrypt_constant_ggsw_ciphertext`] or its
+    /// parallel counterpart
+    /// [`crate::core_crypto::algorithms::par_encrypt_constant_ggsw_ciphertext`] using
     /// this ciphertext as output.
     ///
     /// This docstring exhibits [`GgswCiphertext`] primitives usage.
@@ -389,9 +409,9 @@ impl<Scalar: Copy> GgswCiphertextOwned<Scalar> {
     ///
     /// This function allocates a vector of the appropriate size and wraps it in the appropriate
     /// type. If you want to encrypt data you need to use
-    /// [`crate::core_crypto::algorithms::encrypt_ggsw_ciphertext`] or its parallel counterpart
-    /// [`crate::core_crypto::algorithms::par_encrypt_ggsw_ciphertext`] using this ciphertext as
-    /// output.
+    /// [`crate::core_crypto::algorithms::encrypt_constant_ggsw_ciphertext`] or its parallel
+    /// counterpart [`crate::core_crypto::algorithms::par_encrypt_constant_ggsw_ciphertext`]
+    /// using this ciphertext as output.
     ///
     /// See [`GgswCiphertext::from_container`] for usage.
     pub fn new(

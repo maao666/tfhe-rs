@@ -1,14 +1,15 @@
 //! # WARNING: this module is experimental.
 use crate::core_crypto::algorithms::*;
 use crate::core_crypto::commons::parameters::*;
+use crate::core_crypto::commons::traits::*;
 use crate::core_crypto::entities::*;
-use crate::core_crypto::fft_impl::crypto::bootstrap::FourierLweBootstrapKey;
-use crate::core_crypto::fft_impl::math::fft::Fft;
+use crate::core_crypto::fft_impl::fft64::crypto::bootstrap::FourierLweBootstrapKey;
+use crate::core_crypto::fft_impl::fft64::math::fft::Fft;
 use crate::shortint::ciphertext::Degree;
 use crate::shortint::engine::{EngineResult, ShortintEngine};
 use crate::shortint::server_key::MaxDegree;
 use crate::shortint::wopbs::WopbsKey;
-use crate::shortint::{Ciphertext, ClientKey, Parameters, ServerKey};
+use crate::shortint::{CiphertextBase, ClientKey, PBSOrderMarker, Parameters, ServerKey};
 
 impl ShortintEngine {
     // Creates a key when ONLY a wopbs is used.
@@ -18,7 +19,7 @@ impl ShortintEngine {
         sks: &ServerKey,
     ) -> EngineResult<WopbsKey> {
         let cbs_pfpksk = par_allocate_and_generate_new_circuit_bootstrap_lwe_pfpksk_list(
-            &cks.lwe_secret_key,
+            &cks.large_lwe_secret_key,
             &cks.glwe_secret_key,
             cks.parameters.pfks_base_log,
             cks.parameters.pfks_level,
@@ -108,7 +109,7 @@ impl ShortintEngine {
 
         // KSK to convert from input ciphertext key to the wopbs input one
         let ksk_pbs_large_to_wopbs_large = allocate_and_generate_new_lwe_keyswitch_key(
-            &cks.lwe_secret_key,
+            &cks.large_lwe_secret_key,
             &large_lwe_secret_key,
             cks.parameters.ks_base_log,
             cks.parameters.ks_level,
@@ -120,7 +121,7 @@ impl ShortintEngine {
         // classical PBS. This allows compatibility between PBS and WoPBS
         let ksk_wopbs_large_to_pbs_small = allocate_and_generate_new_lwe_keyswitch_key(
             &large_lwe_secret_key,
-            &cks.lwe_secret_key_after_ks,
+            &cks.small_lwe_secret_key,
             cks.parameters.ks_base_log,
             cks.parameters.ks_level,
             cks.parameters.lwe_modular_std_dev,
@@ -181,6 +182,29 @@ impl ShortintEngine {
         let mut output =
             LweCiphertextListOwned::new(0u64, lwe_size, LweCiphertextCount(extracted_bit_count.0));
 
+        self.extract_bits_assign(
+            delta_log,
+            lwe_in,
+            wopbs_key,
+            extracted_bit_count,
+            &mut output,
+        );
+
+        Ok(output)
+    }
+
+    pub(crate) fn extract_bits_assign<OutputCont>(
+        &mut self,
+        delta_log: DeltaLog,
+        lwe_in: &LweCiphertextOwned<u64>,
+        wopbs_key: &WopbsKey,
+        extracted_bit_count: ExtractedBitsCount,
+        output: &mut LweCiphertextList<OutputCont>,
+    ) where
+        OutputCont: ContainerMut<Element = u64>,
+    {
+        let server_key = &wopbs_key.wopbs_server_key;
+
         let bsk = &server_key.bootstrapping_key;
         let ksk = &server_key.key_switching_key;
 
@@ -203,7 +227,7 @@ impl ShortintEngine {
 
         extract_bits_from_lwe_ciphertext_mem_optimized(
             lwe_in,
-            &mut output,
+            output,
             bsk,
             ksk,
             delta_log,
@@ -211,17 +235,18 @@ impl ShortintEngine {
             fft,
             stack,
         );
-
-        Ok(output)
     }
 
-    pub(crate) fn circuit_bootstrap_with_bits(
+    pub(crate) fn circuit_bootstrap_with_bits<InputCont>(
         &mut self,
         wopbs_key: &WopbsKey,
-        extracted_bits: &LweCiphertextListView<'_, u64>,
+        extracted_bits: &LweCiphertextList<InputCont>,
         lut: &PlaintextListView<'_, u64>,
         count: LweCiphertextCount,
-    ) -> EngineResult<LweCiphertextListOwned<u64>> {
+    ) -> EngineResult<LweCiphertextListOwned<u64>>
+    where
+        InputCont: Container<Element = u64>,
+    {
         let sks = &wopbs_key.wopbs_server_key;
         let fourier_bsk = &sks.bootstrapping_key;
 
@@ -265,14 +290,14 @@ impl ShortintEngine {
         Ok(output_cbs_vp_ct)
     }
 
-    pub(crate) fn extract_bits_circuit_bootstrapping(
+    pub(crate) fn extract_bits_circuit_bootstrapping<OpOrder: PBSOrderMarker>(
         &mut self,
         wopbs_key: &WopbsKey,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBase<OpOrder>,
         lut: &[u64],
         delta_log: DeltaLog,
         nb_bit_to_extract: ExtractedBitsCount,
-    ) -> EngineResult<Ciphertext> {
+    ) -> EngineResult<CiphertextBase<OpOrder>> {
         let extracted_bits =
             self.extract_bits(delta_log, &ct_in.ct, wopbs_key, nb_bit_to_extract)?;
 
@@ -290,22 +315,23 @@ impl ShortintEngine {
         let ciphertext = LweCiphertextOwned::from_container(ciphertext_list.into_container());
 
         let sks = &wopbs_key.wopbs_server_key;
-        let ct_out = Ciphertext {
+        let ct_out = CiphertextBase {
             ct: ciphertext,
             degree: Degree(sks.message_modulus.0 - 1),
             message_modulus: sks.message_modulus,
             carry_modulus: sks.carry_modulus,
+            _order_marker: Default::default(),
         };
 
         Ok(ct_out)
     }
 
-    pub(crate) fn programmable_bootstrapping_without_padding(
+    pub(crate) fn programmable_bootstrapping_without_padding<OpOrder: PBSOrderMarker>(
         &mut self,
         wopbs_key: &WopbsKey,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBase<OpOrder>,
         lut: &[u64],
-    ) -> EngineResult<Ciphertext> {
+    ) -> EngineResult<CiphertextBase<OpOrder>> {
         let sks = &wopbs_key.wopbs_server_key;
         let delta = (1_usize << 63) / (sks.message_modulus.0 * sks.carry_modulus.0) * 2;
         let delta_log = DeltaLog(f64::log2(delta as f64) as usize);
@@ -324,15 +350,15 @@ impl ShortintEngine {
         Ok(ciphertext)
     }
 
-    pub(crate) fn keyswitch_to_wopbs_params(
+    pub(crate) fn keyswitch_to_wopbs_params<OpOrder: PBSOrderMarker>(
         &mut self,
         sks: &ServerKey,
         wopbs_key: &WopbsKey,
-        ct_in: &Ciphertext,
-    ) -> EngineResult<Ciphertext> {
+        ct_in: &CiphertextBase<OpOrder>,
+    ) -> EngineResult<CiphertextBase<OpOrder>> {
         // First PBS to remove the noise
         let acc = self.generate_accumulator(sks, |x| x)?;
-        let ct_clean = self.keyswitch_programmable_bootstrap(sks, ct_in, &acc)?;
+        let ct_clean = self.apply_lookup_table(sks, ct_in, &acc)?;
 
         let mut buffer_lwe_after_ks = LweCiphertextOwned::new(
             0,
@@ -349,26 +375,28 @@ impl ShortintEngine {
             &mut buffer_lwe_after_ks,
         );
 
-        Ok(Ciphertext {
+        Ok(CiphertextBase {
             ct: buffer_lwe_after_ks,
             degree: ct_clean.degree,
             message_modulus: ct_clean.message_modulus,
             carry_modulus: ct_clean.carry_modulus,
+            _order_marker: Default::default(),
         })
     }
 
-    pub(crate) fn keyswitch_to_pbs_params(
+    pub(crate) fn keyswitch_to_pbs_params<OpOrder: PBSOrderMarker>(
         &mut self,
         wopbs_key: &WopbsKey,
-        ct_in: &Ciphertext,
-    ) -> EngineResult<Ciphertext> {
+        ct_in: &CiphertextBase<OpOrder>,
+    ) -> EngineResult<CiphertextBase<OpOrder>> {
         // move to wopbs parameters to pbs parameters
         //Keyswitch-PBS:
         // 1. KS to go back to the original encryption key
         // 2. PBS to remove the noise added by the previous KS
         //
         let acc = self.generate_accumulator(&wopbs_key.pbs_server_key, |x| x)?;
-        let (mut ciphertext_buffers, buffers) = self.buffers_for_key(&wopbs_key.pbs_server_key);
+        let (mut ciphertext_buffers, buffers) =
+            self.get_carry_clearing_accumulator_and_buffers(&wopbs_key.pbs_server_key);
         // Compute a key switch
         keyswitch_lwe_ciphertext(
             &wopbs_key.pbs_server_key.key_switching_key,
@@ -404,20 +432,21 @@ impl ShortintEngine {
             stack,
         );
 
-        Ok(Ciphertext {
+        Ok(CiphertextBase {
             ct: ct_out,
             degree: ct_in.degree,
             message_modulus: ct_in.message_modulus,
             carry_modulus: ct_in.carry_modulus,
+            _order_marker: Default::default(),
         })
     }
 
-    pub(crate) fn wopbs(
+    pub(crate) fn wopbs<OpOrder: PBSOrderMarker>(
         &mut self,
         wopbs_key: &WopbsKey,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBase<OpOrder>,
         lut: &[u64],
-    ) -> EngineResult<Ciphertext> {
+    ) -> EngineResult<CiphertextBase<OpOrder>> {
         let tmp_sks = &wopbs_key.wopbs_server_key;
         let delta = (1_usize << 63) / (tmp_sks.message_modulus.0 * tmp_sks.carry_modulus.0);
         let delta_log = DeltaLog(f64::log2(delta as f64) as usize);
@@ -435,13 +464,13 @@ impl ShortintEngine {
         Ok(ct_out)
     }
 
-    pub(crate) fn programmable_bootstrapping(
+    pub(crate) fn programmable_bootstrapping<OpOrder: PBSOrderMarker>(
         &mut self,
         wopbs_key: &WopbsKey,
         sks: &ServerKey,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBase<OpOrder>,
         lut: &[u64],
-    ) -> EngineResult<Ciphertext> {
+    ) -> EngineResult<CiphertextBase<OpOrder>> {
         let ct_wopbs = self.keyswitch_to_wopbs_params(sks, wopbs_key, ct_in)?;
         let result_ct = self.wopbs(wopbs_key, &ct_wopbs, lut)?;
         let ct_out = self.keyswitch_to_pbs_params(wopbs_key, &result_ct)?;
@@ -449,12 +478,12 @@ impl ShortintEngine {
         Ok(ct_out)
     }
 
-    pub(crate) fn programmable_bootstrapping_native_crt(
+    pub(crate) fn programmable_bootstrapping_native_crt<OpOrder: PBSOrderMarker>(
         &mut self,
         wopbs_key: &WopbsKey,
-        ct_in: &mut Ciphertext,
+        ct_in: &mut CiphertextBase<OpOrder>,
         lut: &[u64],
-    ) -> EngineResult<Ciphertext> {
+    ) -> EngineResult<CiphertextBase<OpOrder>> {
         let nb_bit_to_extract =
             f64::log2((ct_in.message_modulus.0 * ct_in.carry_modulus.0) as f64).ceil() as usize;
         let delta_log = DeltaLog(64 - nb_bit_to_extract);
@@ -482,30 +511,21 @@ impl ShortintEngine {
     /// Temporary wrapper.
     ///
     /// # Warning Experimental
-    pub fn circuit_bootstrapping_vertical_packing(
+    pub fn circuit_bootstrapping_vertical_packing<InputCont>(
         &mut self,
         wopbs_key: &WopbsKey,
-        vec_lut: Vec<Vec<u64>>,
-        extracted_bits_blocks: Vec<LweCiphertextListOwned<u64>>,
-    ) -> Vec<LweCiphertextOwned<u64>> {
-        let lwe_size = extracted_bits_blocks[0].lwe_size();
-
-        let mut all_datas = vec![];
-        for lwe_vec in extracted_bits_blocks.iter() {
-            let data = lwe_vec.as_ref();
-
-            all_datas.extend_from_slice(data);
-        }
-
-        let flatenned_extracted_bits_view =
-            LweCiphertextListView::from_container(all_datas.as_slice(), lwe_size);
-
+        vec_lut: &[Vec<u64>],
+        extracted_bits_blocks: &LweCiphertextList<InputCont>,
+    ) -> Vec<LweCiphertextOwned<u64>>
+    where
+        InputCont: Container<Element = u64>,
+    {
         let flattened_lut: Vec<u64> = vec_lut.iter().flatten().copied().collect();
         let plaintext_lut = PlaintextListView::from_container(&flattened_lut);
         let output_list = self
             .circuit_bootstrap_with_bits(
                 wopbs_key,
-                &flatenned_extracted_bits_view,
+                extracted_bits_blocks,
                 &plaintext_lut,
                 LweCiphertextCount(vec_lut.len()),
             )

@@ -33,8 +33,10 @@ impl<Scalar, C: Container<Element = Scalar>> GgswCiphertextList<C> {
     /// # Note
     ///
     /// This function only wraps a container in the appropriate type. If you want to encrypt data in
-    /// the list you need to use [`crate::core_crypto::algorithms::encrypt_ggsw_ciphertext`] or its
-    /// parallel counterpart [`crate::core_crypto::algorithms::par_encrypt_ggsw_ciphertext`] on the
+    /// the list you need to use
+    /// [`crate::core_crypto::algorithms::encrypt_constant_ggsw_ciphertext`] or its
+    /// parallel counterpart
+    /// [`crate::core_crypto::algorithms::par_encrypt_constant_ggsw_ciphertext`] on the
     /// individual ciphertexts in the list.
     ///
     /// This docstring exhibits [`GgswCiphertextList`] primitives usage.
@@ -161,6 +163,17 @@ impl<Scalar, C: Container<Element = Scalar>> GgswCiphertextList<C> {
     pub fn into_container(self) -> C {
         self.data
     }
+
+    pub fn as_polynomial_list(&self) -> PolynomialListView<'_, Scalar> {
+        PolynomialList::from_container(self.as_ref(), self.polynomial_size())
+    }
+}
+
+impl<Scalar, C: ContainerMut<Element = Scalar>> GgswCiphertextList<C> {
+    pub fn as_mut_polynomial_list(&mut self) -> PolynomialListMutView<'_, Scalar> {
+        let polynomial_size = self.polynomial_size();
+        PolynomialList::from_container(self.as_mut(), polynomial_size)
+    }
 }
 
 /// A [`GgswCiphertextList`] owning the memory for its own storage.
@@ -177,9 +190,9 @@ impl<Scalar: Copy> GgswCiphertextListOwned<Scalar> {
     ///
     /// This function allocates a vector of the appropriate size and wraps it in the appropriate
     /// type. If you want to encrypt data in the list you need to use
-    /// [`crate::core_crypto::algorithms::encrypt_ggsw_ciphertext`] or its parallel counterpart
-    /// [`crate::core_crypto::algorithms::par_encrypt_ggsw_ciphertext`] on the individual
-    /// ciphertexts in the list.
+    /// [`crate::core_crypto::algorithms::encrypt_constant_ggsw_ciphertext`] or its parallel
+    /// counterpart [`crate::core_crypto::algorithms::par_encrypt_constant_ggsw_ciphertext`] on
+    /// the individual ciphertexts in the list.
     ///
     /// See [`GgswCiphertextList::from_container`] for usage.
     pub fn new(

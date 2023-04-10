@@ -32,7 +32,7 @@ on:
 jobs:
   shortint-tests:
     concurrency:
-      group: ${{ github.ref }}_${{ github.event.inputs.instance_image_id }}_${{ github.event.inputs.instance_type }}
+      group: ${{ github.workflow }}_${{ github.ref }}_${{ github.event.inputs.instance_image_id }}_${{ github.event.inputs.instance_type }}
       cancel-in-progress: true
     runs-on: ${{ github.event.inputs.runner_name }}
     steps:
@@ -44,7 +44,7 @@ jobs:
           echo "Type: ${{ github.event.inputs.instance_type }}"
           echo "Request ID: ${{ github.event.inputs.request_id }}"
 
-      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+      - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3
 
       - name: Set up home
         run: |
@@ -58,7 +58,7 @@ jobs:
 
       - name: Run core tests
         run: |
-          make test_core_crypto
+          AVX512_SUPPORT=ON make test_core_crypto
 
       - name: Run boolean tests
         run: |
@@ -82,7 +82,11 @@ jobs:
 
       - name: Run shortint tests
         run: |
-          make test_shortint_ci
+          BIG_TESTS_INSTANCE=TRUE make test_shortint_ci
+
+      - name: Run high-level API tests
+        run: |
+          BIG_TESTS_INSTANCE=TRUE make test_typed_api
 
       - name: Slack Notification
         if: ${{ always() }}

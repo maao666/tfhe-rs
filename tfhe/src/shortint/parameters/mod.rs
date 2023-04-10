@@ -93,12 +93,6 @@ impl Parameters {
     }
 }
 
-impl Default for Parameters {
-    fn default() -> Self {
-        DEFAULT_PARAMETERS
-    }
-}
-
 /// Vector containing all parameter sets
 pub const ALL_PARAMETER_VEC: [Parameters; 28] = WITH_CARRY_PARAMETERS_VEC;
 
@@ -153,9 +147,6 @@ pub const BIVARIATE_PBS_COMPLIANT_PARAMETER_SET_VEC: [Parameters; 16] = [
     PARAM_MESSAGE_3_CARRY_5,
     PARAM_MESSAGE_4_CARRY_4,
 ];
-
-/// Default parameter set
-pub const DEFAULT_PARAMETERS: Parameters = PARAM_MESSAGE_2_CARRY_2;
 
 /// Nomenclature: PARAM_MESSAGE_X_CARRY_Y: the message (respectively carry) modulus is
 /// encoded over X (reps. Y) bits, i.e., message_modulus = 2^{X} (resp. carry_modulus = 2^{Y}).
@@ -864,6 +855,82 @@ pub const PARAM_MESSAGE_8_CARRY_0: Parameters = Parameters {
     carry_modulus: CarryModulus(1),
 };
 
+pub const PARAM_SMALL_MESSAGE_1_CARRY_1: Parameters = Parameters {
+    lwe_dimension: LweDimension(783),
+    glwe_dimension: GlweDimension(3),
+    polynomial_size: PolynomialSize(512),
+    lwe_modular_std_dev: StandardDev(0.0000033382067621812462),
+    glwe_modular_std_dev: StandardDev(0.0000000000034525330484572114),
+    pbs_base_log: DecompositionBaseLog(18),
+    pbs_level: DecompositionLevelCount(1),
+    ks_level: DecompositionLevelCount(3),
+    ks_base_log: DecompositionBaseLog(5),
+    pfks_level: DecompositionLevelCount(0),
+    pfks_base_log: DecompositionBaseLog(0),
+    pfks_modular_std_dev: StandardDev(0.0000000000034525330484572114),
+    cbs_level: DecompositionLevelCount(0),
+    cbs_base_log: DecompositionBaseLog(0),
+    message_modulus: MessageModulus(2),
+    carry_modulus: CarryModulus(2),
+};
+
+pub const PARAM_SMALL_MESSAGE_2_CARRY_2: Parameters = Parameters {
+    lwe_dimension: LweDimension(870),
+    glwe_dimension: GlweDimension(1),
+    polynomial_size: PolynomialSize(2048),
+    lwe_modular_std_dev: StandardDev(0.0000006791658447437413),
+    glwe_modular_std_dev: StandardDev(0.00000000000000029403601535432533),
+    pbs_base_log: DecompositionBaseLog(23),
+    pbs_level: DecompositionLevelCount(1),
+    ks_level: DecompositionLevelCount(4),
+    ks_base_log: DecompositionBaseLog(4),
+    pfks_level: DecompositionLevelCount(0),
+    pfks_base_log: DecompositionBaseLog(0),
+    pfks_modular_std_dev: StandardDev(0.00000000000000029403601535432533),
+    cbs_level: DecompositionLevelCount(0),
+    cbs_base_log: DecompositionBaseLog(0),
+    message_modulus: MessageModulus(4),
+    carry_modulus: CarryModulus(4),
+};
+
+pub const PARAM_SMALL_MESSAGE_3_CARRY_3: Parameters = Parameters {
+    lwe_dimension: LweDimension(1025),
+    glwe_dimension: GlweDimension(1),
+    polynomial_size: PolynomialSize(8192),
+    lwe_modular_std_dev: StandardDev(0.00000003980397588319241),
+    glwe_modular_std_dev: StandardDev(0.0000000000000000002168404344971009),
+    pbs_base_log: DecompositionBaseLog(15),
+    pbs_level: DecompositionLevelCount(2),
+    ks_level: DecompositionLevelCount(5),
+    ks_base_log: DecompositionBaseLog(4),
+    pfks_level: DecompositionLevelCount(0),
+    pfks_base_log: DecompositionBaseLog(0),
+    pfks_modular_std_dev: StandardDev(0.0000000000000000002168404344971009),
+    cbs_level: DecompositionLevelCount(0),
+    cbs_base_log: DecompositionBaseLog(0),
+    message_modulus: MessageModulus(8),
+    carry_modulus: CarryModulus(8),
+};
+
+pub const PARAM_SMALL_MESSAGE_4_CARRY_4: Parameters = Parameters {
+    lwe_dimension: LweDimension(1214),
+    glwe_dimension: GlweDimension(1),
+    polynomial_size: PolynomialSize(32768),
+    lwe_modular_std_dev: StandardDev(0.0000000012520482863081104),
+    glwe_modular_std_dev: StandardDev(0.0000000000000000002168404344971009),
+    pbs_base_log: DecompositionBaseLog(15),
+    pbs_level: DecompositionLevelCount(2),
+    ks_level: DecompositionLevelCount(6),
+    ks_base_log: DecompositionBaseLog(4),
+    pfks_level: DecompositionLevelCount(0),
+    pfks_base_log: DecompositionBaseLog(0),
+    pfks_modular_std_dev: StandardDev(0.0000000000000000002168404344971009),
+    cbs_level: DecompositionLevelCount(0),
+    cbs_base_log: DecompositionBaseLog(0),
+    message_modulus: MessageModulus(16),
+    carry_modulus: CarryModulus(16),
+};
+
 /// Return a parameter set from a message and carry moduli.
 ///
 /// # Example
@@ -878,7 +945,7 @@ pub const PARAM_MESSAGE_8_CARRY_0: Parameters = Parameters {
 /// assert_eq!(param, PARAM_MESSAGE_3_CARRY_1);
 /// ```
 pub fn get_parameters_from_message_and_carry(msg_space: usize, carry_space: usize) -> Parameters {
-    let mut out = Parameters::default();
+    let mut out = PARAM_MESSAGE_2_CARRY_2;
     let mut flag: bool = false;
     let mut rescaled_message_space = f64::ceil(f64::log2(msg_space as f64)) as usize;
     rescaled_message_space = 1 << rescaled_message_space;

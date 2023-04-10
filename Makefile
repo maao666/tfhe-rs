@@ -1,4 +1,5 @@
 SHELL:=$(shell /usr/bin/env which bash)
+OS:=$(shell uname)
 RS_CHECK_TOOLCHAIN:=$(shell cat toolchain.txt | tr -d '\n')
 CARGO_RS_CHECK_TOOLCHAIN:=+$(RS_CHECK_TOOLCHAIN)
 TARGET_ARCH_FEATURE:=$(shell ./scripts/get_arch_feature.sh)
@@ -8,6 +9,7 @@ CARGO_RS_BUILD_TOOLCHAIN:=+$(RS_BUILD_TOOLCHAIN)
 MIN_RUST_VERSION:=1.65
 AVX512_SUPPORT?=OFF
 WASM_RUSTFLAGS:=
+BIG_TESTS_INSTANCE?=FALSE
 # This is done to avoid forgetting it, we still precise the RUSTFLAGS in the commands to be able to
 # copy paste the command in the terminal and change them if required without forgetting the flags
 export RUSTFLAGS?=-C target-cpu=native
@@ -57,6 +59,15 @@ fmt: install_rs_check_toolchain
 check_fmt: install_rs_check_toolchain
 	cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" fmt --check
 
+.PHONY: clippy_core # Run clippy lints on core_crypto with and without experimental features
+clippy_core: install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" clippy \
+		--features=$(TARGET_ARCH_FEATURE) \
+		-p tfhe -- --no-deps -D warnings
+	RUSTFLAGS="$(RUSTFLAGS)" cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" clippy \
+		--features=$(TARGET_ARCH_FEATURE),experimental \
+		-p tfhe -- --no-deps -D warnings
+
 .PHONY: clippy_boolean # Run clippy lints enabling the boolean features
 clippy_boolean: install_rs_check_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" clippy \
@@ -69,10 +80,16 @@ clippy_shortint: install_rs_check_toolchain
 		--features=$(TARGET_ARCH_FEATURE),shortint \
 		-p tfhe -- --no-deps -D warnings
 
-.PHONY: clippy # Run clippy lints enabling the boolean, shortint
-clippy: install_rs_check_toolchain
+.PHONY: clippy_integer # Run clippy lints enabling the integer features
+clippy_integer: install_rs_check_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" clippy \
-		--features=$(TARGET_ARCH_FEATURE),boolean,shortint \
+		--features=$(TARGET_ARCH_FEATURE),integer \
+		-p tfhe -- --no-deps -D warnings
+
+.PHONY: clippy # Run clippy lints enabling the boolean, shortint, integer
+clippy: install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" clippy --all-targets \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer \
 		-p tfhe -- --no-deps -D warnings
 
 .PHONY: clippy_c_api # Run clippy lints enabling the boolean, shortint and the C API
@@ -95,12 +112,12 @@ clippy_tasks:
 .PHONY: clippy_all_targets # Run clippy lints on all targets (benches, examples, etc.)
 clippy_all_targets:
 	RUSTFLAGS="$(RUSTFLAGS)" cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" clippy --all-targets \
-		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,internal-keycache \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache \
 		-p tfhe -- --no-deps -D warnings
 
 .PHONY: clippy_all # Run all clippy targets
-clippy_all: clippy clippy_boolean clippy_shortint clippy_all_targets clippy_c_api \
-clippy_js_wasm_api clippy_tasks
+clippy_all: clippy clippy_boolean clippy_shortint clippy_integer clippy_all_targets clippy_c_api \
+clippy_js_wasm_api clippy_tasks clippy_core
 
 .PHONY: gen_key_cache # Run the script to generate keys and cache them for shortint tests
 gen_key_cache: install_rs_build_toolchain
@@ -108,44 +125,71 @@ gen_key_cache: install_rs_build_toolchain
 		--example generates_test_keys \
 		--features=$(TARGET_ARCH_FEATURE),shortint,internal-keycache -p tfhe
 
+.PHONY: build_core # Build core_crypto without experimental features
+build_core: install_rs_build_toolchain install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+		--features=$(TARGET_ARCH_FEATURE) -p tfhe
+	@if [[ "$(AVX512_SUPPORT)" == "ON" ]]; then \
+		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --release \
+			--features=$(TARGET_ARCH_FEATURE),$(AVX512_FEATURE) -p tfhe; \
+	fi
+
+.PHONY: build_core_experimental # Build core_crypto with experimental features
+build_core_experimental: install_rs_build_toolchain install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+		--features=$(TARGET_ARCH_FEATURE),experimental -p tfhe
+	@if [[ "$(AVX512_SUPPORT)" == "ON" ]]; then \
+		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --release \
+			--features=$(TARGET_ARCH_FEATURE),experimental,$(AVX512_FEATURE) -p tfhe; \
+	fi
+
 .PHONY: build_boolean # Build with boolean enabled
 build_boolean: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
-		--features=$(TARGET_ARCH_FEATURE),boolean -p tfhe
+		--features=$(TARGET_ARCH_FEATURE),boolean -p tfhe --all-targets
 
 .PHONY: build_shortint # Build with shortint enabled
 build_shortint: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
-		--features=$(TARGET_ARCH_FEATURE),shortint -p tfhe
+		--features=$(TARGET_ARCH_FEATURE),shortint -p tfhe --all-targets
 
-.PHONY: build_boolean_and_shortint # Build with boolean and shortint enabled
-build_boolean_and_shortint: install_rs_build_toolchain
+.PHONY: build_integer # Build with integer enabled
+build_integer: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
-		--features=$(TARGET_ARCH_FEATURE),boolean,shortint -p tfhe
+		--features=$(TARGET_ARCH_FEATURE),integer -p tfhe --all-targets
+
+.PHONY: build_tfhe_full # Build with boolean, shortint and integer enabled
+build_tfhe_full: install_rs_build_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer -p tfhe --all-targets
 
 .PHONY: build_c_api # Build the C API for boolean and shortint
 build_c_api: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
-		--features=$(TARGET_ARCH_FEATURE),boolean-c-api,shortint-c-api -p tfhe
+		--features=$(TARGET_ARCH_FEATURE),boolean-c-api,shortint-c-api -p tfhe --all-targets
 
 .PHONY: build_web_js_api # Build the js API targeting the web browser
 build_web_js_api: install_rs_build_toolchain
 	cd tfhe && \
 	RUSTFLAGS="$(WASM_RUSTFLAGS)" rustup run "$(RS_BUILD_TOOLCHAIN)" \
 		wasm-pack build --release --target=web \
-		--features=boolean-client-js-wasm-api,shortint-client-js-wasm-api
+		-- --features=boolean-client-js-wasm-api,shortint-client-js-wasm-api
 
 .PHONY: build_node_js_api # Build the js API targeting nodejs
 build_node_js_api: install_rs_build_toolchain
 	cd tfhe && \
 	RUSTFLAGS="$(WASM_RUSTFLAGS)" rustup run "$(RS_BUILD_TOOLCHAIN)" \
 		wasm-pack build --release --target=nodejs \
-		--features=boolean-client-js-wasm-api,shortint-client-js-wasm-api
+		-- --features=boolean-client-js-wasm-api,shortint-client-js-wasm-api
 
-.PHONY: test_core_crypto # Run the tests of the core_crypto module
-test_core_crypto: install_rs_build_toolchain
+.PHONY: test_core_crypto # Run the tests of the core_crypto module including experimental ones
+test_core_crypto: install_rs_build_toolchain install_rs_check_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
-		--features=$(TARGET_ARCH_FEATURE) -p tfhe -- core_crypto::
+		--features=$(TARGET_ARCH_FEATURE),experimental -p tfhe -- core_crypto::
+	@if [[ "$(AVX512_SUPPORT)" == "ON" ]]; then \
+		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) test --release \
+			--features=$(TARGET_ARCH_FEATURE),experimental,$(AVX512_FEATURE) -p tfhe -- core_crypto::; \
+	fi
 
 .PHONY: test_boolean # Run the tests of the boolean module
 test_boolean: install_rs_build_toolchain
@@ -158,24 +202,40 @@ test_c_api: build_c_api
 
 .PHONY: test_shortint_ci # Run the tests for shortint ci
 test_shortint_ci: install_rs_build_toolchain install_cargo_nextest
-	./scripts/shortint-tests.sh $(CARGO_RS_BUILD_TOOLCHAIN)
+	BIG_TESTS_INSTANCE="$(BIG_TESTS_INSTANCE)" \
+		./scripts/shortint-tests.sh $(CARGO_RS_BUILD_TOOLCHAIN)
 
 .PHONY: test_shortint # Run all the tests for shortint
 test_shortint: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
 		--features=$(TARGET_ARCH_FEATURE),shortint,internal-keycache -p tfhe -- shortint::
 
+.PHONY: test_integer_ci # Run the tests for integer ci
+test_integer_ci: install_rs_build_toolchain install_cargo_nextest
+	BIG_TESTS_INSTANCE="$(BIG_TESTS_INSTANCE)" \
+		./scripts/integer-tests.sh $(CARGO_RS_BUILD_TOOLCHAIN)
+
+.PHONY: test_integer # Run all the tests for integer
+test_integer: install_rs_build_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
+		--features=$(TARGET_ARCH_FEATURE),integer,internal-keycache -p tfhe -- integer::
+
+.PHONY: test_typed_api # Run all the tests for typed_api
+test_typed_api: install_rs_build_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache -p tfhe -- typed_api::
+
 .PHONY: test_user_doc # Run tests from the .md documentation
 test_user_doc: install_rs_build_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release --doc \
-		--features=$(TARGET_ARCH_FEATURE),shortint,boolean,internal-keycache -p tfhe \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache -p tfhe \
 		-- test_user_docs::
 
 .PHONY: doc # Build rust doc
 doc: install_rs_check_toolchain
 	RUSTDOCFLAGS="--html-in-header katex-header.html -Dwarnings" \
 	cargo "$(CARGO_RS_CHECK_TOOLCHAIN)" doc \
-		--features=$(TARGET_ARCH_FEATURE),boolean,shortint --no-deps
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer --no-deps
 
 .PHONY: format_doc_latex # Format the documentation latex equations to avoid broken rendering.
 format_doc_latex:
@@ -189,8 +249,11 @@ format_doc_latex:
 .PHONY: check_compile_tests # Build tests in debug without running them
 check_compile_tests: build_c_api
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --no-run \
-		--features=$(TARGET_ARCH_FEATURE),shortint,boolean,internal-keycache -p tfhe && \
-		./scripts/c_api_tests.sh --build-only
+		--features=$(TARGET_ARCH_FEATURE),experimental,boolean,shortint,integer,internal-keycache \
+		-p tfhe
+		@if [[ "$(OS)" == "Linux" || "$(OS)" == "Darwin" ]]; then \
+			./scripts/c_api_tests.sh --build-only; \
+		fi
 
 .PHONY: build_nodejs_test_docker # Build a docker image with tools to run nodejs tests for wasm API
 build_nodejs_test_docker:

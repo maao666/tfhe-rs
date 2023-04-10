@@ -8,9 +8,10 @@
 //! both uses.
 
 use crate::core_crypto::commons::parameters::*;
+use crate::core_crypto::commons::traits::*;
 use crate::core_crypto::entities::*;
 use crate::shortint::engine::ShortintEngine;
-use crate::shortint::{Ciphertext, ClientKey, Parameters, ServerKey};
+use crate::shortint::{CiphertextBase, ClientKey, PBSOrderMarker, Parameters, ServerKey};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
@@ -42,7 +43,7 @@ impl WopbsKey {
     /// use tfhe::shortint::wopbs::*;
     ///
     /// // Generate the client key and the server key:
-    /// let (mut cks, mut sks) = gen_keys(WOPBS_PARAM_MESSAGE_1_CARRY_1);
+    /// let (cks, sks) = gen_keys(WOPBS_PARAM_MESSAGE_1_CARRY_1);
     /// let mut wopbs_key = WopbsKey::new_wopbs_key_only_for_wopbs(&cks, &sks);
     /// ```
     pub fn new_wopbs_key_only_for_wopbs(cks: &ClientKey, sks: &ServerKey) -> WopbsKey {
@@ -61,7 +62,7 @@ impl WopbsKey {
     /// use tfhe::shortint::wopbs::*;
     ///
     /// // Generate the client key and the server key:
-    /// let (mut cks, mut sks) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_1_CARRY_1);
     /// let mut wopbs_key = WopbsKey::new_wopbs_key(&cks, &sks, &WOPBS_PARAM_MESSAGE_1_CARRY_1);
     /// ```
     pub fn new_wopbs_key(cks: &ClientKey, sks: &ServerKey, parameters: &Parameters) -> WopbsKey {
@@ -78,24 +79,27 @@ impl WopbsKey {
     ///
     /// ```rust
     /// use rand::Rng;
-    /// use tfhe::shortint::ciphertext::Ciphertext;
     /// use tfhe::shortint::gen_keys;
     /// use tfhe::shortint::parameters::parameters_wopbs_message_carry::WOPBS_PARAM_MESSAGE_2_CARRY_2;
     /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
     /// use tfhe::shortint::wopbs::*;
     ///
     /// // Generate the client key and the server key:
-    /// let (mut cks, mut sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
     /// let mut wopbs_key = WopbsKey::new_wopbs_key(&cks, &sks, &WOPBS_PARAM_MESSAGE_2_CARRY_2);
     /// let message_modulus = WOPBS_PARAM_MESSAGE_2_CARRY_2.message_modulus.0 as u64;
     /// let m = 2;
     /// let mut ct = cks.encrypt(m);
     /// let lut = wopbs_key.generate_lut(&ct, |x| x * x % message_modulus);
-    /// let ct_res = wopbs_key.programmable_bootstrapping(&mut sks, &mut ct, &lut);
+    /// let ct_res = wopbs_key.programmable_bootstrapping(&sks, &mut ct, &lut);
     /// let res = cks.decrypt(&ct_res);
     /// assert_eq!(res, (m * m) % message_modulus);
     /// ```
-    pub fn generate_lut<F>(&self, ct: &Ciphertext, f: F) -> Vec<u64>
+    pub fn generate_lut<F, OpOrder: PBSOrderMarker>(
+        &self,
+        ct: &CiphertextBase<OpOrder>,
+        f: F,
+    ) -> Vec<u64>
     where
         F: Fn(u64) -> u64,
     {
@@ -118,13 +122,12 @@ impl WopbsKey {
     ///
     /// ```rust
     /// use rand::Rng;
-    /// use tfhe::shortint::ciphertext::Ciphertext;
     /// use tfhe::shortint::gen_keys;
     /// use tfhe::shortint::parameters::parameters_wopbs_message_carry::WOPBS_PARAM_MESSAGE_2_CARRY_2;
     /// use tfhe::shortint::wopbs::WopbsKey;
     ///
     /// // Generate the client key and the server key:
-    /// let (mut cks, mut sks) = gen_keys(WOPBS_PARAM_MESSAGE_2_CARRY_2);
+    /// let (cks, sks) = gen_keys(WOPBS_PARAM_MESSAGE_2_CARRY_2);
     /// let mut wopbs_key = WopbsKey::new_wopbs_key_only_for_wopbs(&cks, &sks);
     /// let message_modulus = WOPBS_PARAM_MESSAGE_2_CARRY_2.message_modulus.0 as u64;
     /// let m = 2;
@@ -134,7 +137,11 @@ impl WopbsKey {
     /// let res = cks.decrypt_without_padding(&ct_res);
     /// assert_eq!(res, (m * m) % message_modulus);
     /// ```
-    pub fn generate_lut_without_padding<F>(&self, ct: &Ciphertext, f: F) -> Vec<u64>
+    pub fn generate_lut_without_padding<F, OpOrder: PBSOrderMarker>(
+        &self,
+        ct: &CiphertextBase<OpOrder>,
+        f: F,
+    ) -> Vec<u64>
     where
         F: Fn(u64) -> u64,
     {
@@ -156,7 +163,6 @@ impl WopbsKey {
     ///
     /// ```rust
     /// use rand::Rng;
-    /// use tfhe::shortint::ciphertext::Ciphertext;
     /// use tfhe::shortint::gen_keys;
     /// use tfhe::shortint::parameters::parameters_wopbs::WOPBS_PARAM_MESSAGE_3_NORM2_2;
     /// use tfhe::shortint::wopbs::WopbsKey;
@@ -172,7 +178,11 @@ impl WopbsKey {
     /// let res = cks.decrypt_message_native_crt(&ct_res, message_modulus);
     /// assert_eq!(res, (m * m) % message_modulus as u64);
     /// ```
-    pub fn generate_lut_native_crt<F>(&self, ct: &Ciphertext, f: F) -> Vec<u64>
+    pub fn generate_lut_native_crt<F, OpOrder: PBSOrderMarker>(
+        &self,
+        ct: &CiphertextBase<OpOrder>,
+        f: F,
+    ) -> Vec<u64>
     where
         F: Fn(u64) -> u64,
     {
@@ -197,7 +207,6 @@ impl WopbsKey {
     ///
     /// ```rust
     /// use rand::Rng;
-    /// use tfhe::shortint::ciphertext::Ciphertext;
     /// use tfhe::shortint::gen_keys;
     /// use tfhe::shortint::parameters::parameters_wopbs_message_carry::WOPBS_PARAM_MESSAGE_2_CARRY_2;
     /// use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
@@ -214,12 +223,12 @@ impl WopbsKey {
     /// let res = cks.decrypt_message_and_carry(&ct_res);
     /// assert_eq!(res, 1);
     /// ```
-    pub fn programmable_bootstrapping(
+    pub fn programmable_bootstrapping<OpOrder: PBSOrderMarker>(
         &self,
         sks: &ServerKey,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBase<OpOrder>,
         lut: &[u64],
-    ) -> Ciphertext {
+    ) -> CiphertextBase<OpOrder> {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine
                 .programmable_bootstrapping(self, sks, ct_in, lut)
@@ -236,7 +245,6 @@ impl WopbsKey {
     ///
     /// ```rust
     /// use rand::Rng;
-    /// use tfhe::shortint::ciphertext::Ciphertext;
     /// use tfhe::shortint::gen_keys;
     /// use tfhe::shortint::parameters::parameters_wopbs_message_carry::WOPBS_PARAM_MESSAGE_2_CARRY_2;
     /// use tfhe::shortint::wopbs::*;
@@ -252,7 +260,11 @@ impl WopbsKey {
     /// let res = cks.decrypt_message_and_carry(&ct_res);
     /// assert_eq!(res, 1);
     /// ```
-    pub fn wopbs(&self, ct_in: &Ciphertext, lut: &[u64]) -> Ciphertext {
+    pub fn wopbs<OpOrder: PBSOrderMarker>(
+        &self,
+        ct_in: &CiphertextBase<OpOrder>,
+        lut: &[u64],
+    ) -> CiphertextBase<OpOrder> {
         ShortintEngine::with_thread_local_mut(|engine| engine.wopbs(self, ct_in, lut).unwrap())
     }
 
@@ -262,7 +274,6 @@ impl WopbsKey {
     ///
     /// ```rust
     /// use rand::Rng;
-    /// use tfhe::shortint::ciphertext::Ciphertext;
     /// use tfhe::shortint::gen_keys;
     /// use tfhe::shortint::parameters::parameters_wopbs::WOPBS_PARAM_MESSAGE_1_NORM2_2;
     /// use tfhe::shortint::wopbs::*;
@@ -276,11 +287,11 @@ impl WopbsKey {
     /// let res = cks.decrypt_message_and_carry_without_padding(&ct_res);
     /// assert_eq!(res, 1);
     /// ```
-    pub fn programmable_bootstrapping_without_padding(
+    pub fn programmable_bootstrapping_without_padding<OpOrder: PBSOrderMarker>(
         &self,
-        ct_in: &Ciphertext,
+        ct_in: &CiphertextBase<OpOrder>,
         lut: &[u64],
-    ) -> Ciphertext {
+    ) -> CiphertextBase<OpOrder> {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine
                 .programmable_bootstrapping_without_padding(self, ct_in, lut)
@@ -293,7 +304,6 @@ impl WopbsKey {
     /// # Example
     ///
     /// ```rust
-    /// use tfhe::shortint::ciphertext::Ciphertext;
     /// use tfhe::shortint::gen_keys;
     /// use tfhe::shortint::parameters::parameters_wopbs::WOPBS_PARAM_MESSAGE_3_NORM2_2;
     /// use tfhe::shortint::wopbs::*;
@@ -308,11 +318,11 @@ impl WopbsKey {
     /// let res = cks.decrypt_message_native_crt(&ct_res, modulus);
     /// assert_eq!(res, msg);
     /// ```
-    pub fn programmable_bootstrapping_native_crt(
+    pub fn programmable_bootstrapping_native_crt<OpOrder: PBSOrderMarker>(
         &self,
-        ct_in: &mut Ciphertext,
+        ct_in: &mut CiphertextBase<OpOrder>,
         lut: &[u64],
-    ) -> Ciphertext {
+    ) -> CiphertextBase<OpOrder> {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine
                 .programmable_bootstrapping_native_crt(self, ct_in, lut)
@@ -323,10 +333,10 @@ impl WopbsKey {
     /// Extract the given number of bits from a ciphertext.
     ///
     /// # Warning Experimental
-    pub fn extract_bits(
+    pub fn extract_bits<OpOrder: PBSOrderMarker>(
         &self,
         delta_log: DeltaLog,
-        ciphertext: &Ciphertext,
+        ciphertext: &CiphertextBase<OpOrder>,
         num_bits_to_extract: usize,
     ) -> LweCiphertextListOwned<u64> {
         ShortintEngine::with_thread_local_mut(|engine| {
@@ -341,27 +351,60 @@ impl WopbsKey {
         })
     }
 
+    /// Extract the given number of bits from a ciphertext.
+    ///
+    /// # Warning Experimental
+    pub fn extract_bits_assign<OutputCont, OpOrder: PBSOrderMarker>(
+        &self,
+        delta_log: DeltaLog,
+        ciphertext: &CiphertextBase<OpOrder>,
+        num_bits_to_extract: usize,
+        output: &mut LweCiphertextList<OutputCont>,
+    ) where
+        OutputCont: ContainerMut<Element = u64>,
+    {
+        ShortintEngine::with_thread_local_mut(|engine| {
+            engine.extract_bits_assign(
+                delta_log,
+                &ciphertext.ct,
+                self,
+                ExtractedBitsCount(num_bits_to_extract),
+                output,
+            )
+        })
+    }
+
     /// Temporary wrapper.
     ///
     /// # Warning Experimental
-    pub fn circuit_bootstrapping_vertical_packing(
+    pub fn circuit_bootstrapping_vertical_packing<InputCont>(
         &self,
-        vec_lut: Vec<Vec<u64>>,
-        extracted_bits_blocks: Vec<LweCiphertextListOwned<u64>>,
-    ) -> Vec<LweCiphertextOwned<u64>> {
+        vec_lut: &[Vec<u64>],
+        extracted_bits_blocks: &LweCiphertextList<InputCont>,
+    ) -> Vec<LweCiphertextOwned<u64>>
+    where
+        InputCont: Container<Element = u64>,
+    {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine.circuit_bootstrapping_vertical_packing(self, vec_lut, extracted_bits_blocks)
         })
     }
 
-    pub fn keyswitch_to_wopbs_params(&self, sks: &ServerKey, ct_in: &Ciphertext) -> Ciphertext {
+    pub fn keyswitch_to_wopbs_params<OpOrder: PBSOrderMarker>(
+        &self,
+        sks: &ServerKey,
+        ct_in: &CiphertextBase<OpOrder>,
+    ) -> CiphertextBase<OpOrder> {
         ShortintEngine::with_thread_local_mut(|engine| {
             engine.keyswitch_to_wopbs_params(sks, self, ct_in)
         })
         .unwrap()
     }
 
-    pub fn keyswitch_to_pbs_params(&self, ct_in: &Ciphertext) -> Ciphertext {
+    pub fn keyswitch_to_pbs_params<OpOrder: PBSOrderMarker>(
+        &self,
+        ct_in: &CiphertextBase<OpOrder>,
+    ) -> CiphertextBase<OpOrder> {
         ShortintEngine::with_thread_local_mut(|engine| engine.keyswitch_to_pbs_params(self, ct_in))
             .unwrap()
     }

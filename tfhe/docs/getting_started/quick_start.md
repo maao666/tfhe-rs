@@ -15,44 +15,109 @@ The overall process to write an homomorphic program is the same for both Boolean
 * Compute over encrypted data using the server key
 * Decrypt data with the client key
 
-### Boolean example.
+
+### API Levels
+
+This library has different modules, with different level of abstraction.
+
+There is a the core_crypto module which is the lowest level API, with the primitive
+functions and types of the TFHE scheme.
+
+The are the boolean, shortint and integer modules which are based on the core_crypto,
+to allow construction of respectively, booleans, short integers, and integers circuits.
+
+Then there is the high-level module built on top of the boolean, shortint, integer modules,
+this module is meant to abstract as much as possible the TFHE part and allow quick development of
+FHE applications.
+
+#### High Level API
+
+tfhe-rs by default exposes a High Level API, that manages the server_key and proposes datatypes
+that try to match Rust's native types by having overloaded operators (+, -, ...).
+
+Here is an example to illustrate how the high level API is used.
+
+{% hint style="info" %}
+Use the `--release` flag to run this example (eg: `cargo run --release`)
+{% endhint %}
+
+
+```rust
+use tfhe::{ConfigBuilder, generate_keys, set_server_key, FheUint8};
+use tfhe::prelude::*;
+
+fn main() {
+    let config = ConfigBuilder::all_disabled()
+        .enable_default_uint8()
+        .build();
+
+    let (client_key, server_key) = generate_keys(config);
+
+    set_server_key(server_key);
+
+    let clear_a = 27u8;
+    let clear_b = 128u8;
+
+    let a = FheUint8::encrypt(clear_a, &client_key);
+    let b = FheUint8::encrypt(clear_b, &client_key);
+
+    let result = a + b;
+
+    let decrypted_result: u8 = result.decrypt(&client_key);
+
+    let clear_result = clear_a + clear_b;
+
+    assert_eq!(decrypted_result, clear_result);
+}
+```
+
+#### Boolean example.
 
 Here is an example to illustrate how the library can be used to evaluate a Boolean circuit:
+
+{% hint style="info" %}
+Use the `--release` flag to run this example (eg: `cargo run --release`)
+{% endhint %}
 
 ```rust
 use tfhe::boolean::prelude::*;
 
 fn main() {
-// We generate a set of client/server keys, using the default parameters:
-    let (mut client_key, mut server_key) = gen_keys();
+    // We generate a set of client/server keys, using the default parameters:
+    let (client_key, server_key) = gen_keys();
 
-// We use the client secret key to encrypt two messages:
+    // We use the client secret key to encrypt two messages:
     let ct_1 = client_key.encrypt(true);
     let ct_2 = client_key.encrypt(false);
 
-// We use the server public key to execute a boolean circuit:
-// if ((NOT ct_2) NAND (ct_1 AND ct_2)) then (NOT ct_2) else (ct_1 AND ct_2)
+    // We use the server public key to execute a boolean circuit:
+    // if ((NOT ct_2) NAND (ct_1 AND ct_2)) then (NOT ct_2) else (ct_1 AND ct_2)
     let ct_3 = server_key.not(&ct_2);
     let ct_4 = server_key.and(&ct_1, &ct_2);
     let ct_5 = server_key.nand(&ct_3, &ct_4);
     let ct_6 = server_key.mux(&ct_5, &ct_3, &ct_4);
 
-// We use the client key to decrypt the output of the circuit:
+    // We use the client key to decrypt the output of the circuit:
     let output = client_key.decrypt(&ct_6);
     assert_eq!(output, true);
 }
 ```
 
-### Shortint example.
+#### Shortint example.
 
 And here is a full example using shortint:
+
+{% hint style="info" %}
+Use the `--release` flag to run this example (eg: `cargo run --release`)
+{% endhint %}
 
 ```rust
 use tfhe::shortint::prelude::*;
 
 fn main() {
-    // We generate a set of client/server keys, using the default parameters:
-    let (client_key, server_key) = gen_keys(Parameters::default());
+    // We generate a set of client/server keys
+    // using parameters with 2 bits of message and 2 bits of carry
+    let (client_key, server_key) = gen_keys(PARAM_MESSAGE_2_CARRY_2);
 
     let msg1 = 1;
     let msg2 = 0;
@@ -69,6 +134,34 @@ fn main() {
     // We use the client key to decrypt the output of the circuit:
     let output = client_key.decrypt(&ct_3);
     assert_eq!(output, (msg1 + msg2) % modulus as u64);
+}
+```
+
+#### Integer example.
+
+{% hint style="info" %}
+Use the `--release` flag to run this example (eg: `cargo run --release`)
+{% endhint %}
+
+```rust
+use tfhe::integer::gen_keys_radix;
+use tfhe::shortint::parameters::PARAM_MESSAGE_2_CARRY_2;
+
+fn main() {
+    // We create keys for radix represention to create 16 bits integers
+    // using 8 blocks of 2 bits
+    let (cks, sks) = gen_keys_radix(&PARAM_MESSAGE_2_CARRY_2, 8);
+
+    let clear_a = 2382u16;
+    let clear_b = 29374u16;
+
+    let mut a = cks.encrypt(clear_a as u64);
+    let mut b = cks.encrypt(clear_b as u64);
+
+    let encrypted_max = sks.smart_max_parallelized(&mut a, &mut b);
+    let decrypted_max: u64 = cks.decrypt(&encrypted_max);
+
+    assert_eq!(decrypted_max as u16, clear_a.max(clear_b))
 }
 ```
 

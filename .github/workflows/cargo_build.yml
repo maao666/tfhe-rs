@@ -17,20 +17,20 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
-
-      - name: Get rust toolchain to use for checks and lints
-        id: toolchain
-        run: |
-          echo "rs-toolchain=$(make rs_toolchain)" >> "${GITHUB_OUTPUT}"
+      - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3
 
       - name: Run pcc checks
         run: |
           make pcc
+
+      - name: Build Release core
+        run: |
+          make build_core AVX512_SUPPORT=ON
+          make build_core_experimental AVX512_SUPPORT=ON
 
       - name: Build Release boolean
         run: |
@@ -40,9 +40,13 @@ jobs:
         run: |
           make build_shortint
 
-      - name: Build Release shortint and boolean
+      - name: Build Release integer
         run: |
-          make build_boolean_and_shortint
+          make build_integer
+
+      - name: Build Release tfhe full
+        run: |
+          make build_tfhe_full
 
       - name: Build Release c_api
         run: |

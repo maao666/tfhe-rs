@@ -5,8 +5,8 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Replace default archive.ubuntu.com with fr mirror
 # original archive showed performance issues and is farther away
-RUN sed -i 's|^deb http://archive|deb http://fr.archive|g' /etc/apt/sources.list && \
-    sed -i 's|^deb http://security|deb http://fr.archive|g' /etc/apt/sources.list
+RUN sed -i 's|^deb http://archive.ubuntu.com/ubuntu/|deb http://mirror.ubuntu.ikoula.com/|g' /etc/apt/sources.list && \
+    sed -i 's|^deb http://security.ubuntu.com/ubuntu/|deb http://mirror.ubuntu.ikoula.com/|g' /etc/apt/sources.list
 
 ENV CARGO_TARGET_DIR=/root/tfhe-rs-target
 
@@ -18,7 +18,10 @@ RUN apt-get update && \
     apt-get install -y \
     build-essential \
     curl \
-    git && \
+    git \
+    python3 \
+    python3-pip \
+    python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install-rustup.sh && \
@@ -29,7 +32,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install-rustup.s
     chmod +x install-wasm-pack.sh && \
     . "$HOME/.cargo/env" && \
     ./install-wasm-pack.sh -y && \
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.2/install.sh > install-node.sh && \
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh > install-node.sh && \
     chmod +x install-node.sh && \
     ./install-node.sh && \
     . "$HOME/.nvm/nvm.sh" && \

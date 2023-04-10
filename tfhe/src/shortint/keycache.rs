@@ -173,12 +173,13 @@ pub mod utils {
 
             let try_load_from_memory_and_init = || {
                 // we only hold a read lock for a short duration to find the key
-                let memory_storage = self.memory_storage.read().unwrap();
-                let maybe_shared_cell = memory_storage
-                    .iter()
-                    .find(|(p, _)| *p == param)
-                    .map(|param_key| param_key.1.clone());
-                drop(memory_storage);
+                let maybe_shared_cell = {
+                    let memory_storage = self.memory_storage.read().unwrap();
+                    memory_storage
+                        .iter()
+                        .find(|(p, _)| *p == param)
+                        .map(|param_key| param_key.1.clone())
+                };
 
                 if let Some(shared_cell) = maybe_shared_cell {
                     shared_cell.inner.get_or_init(load_from_persistent_storage);
@@ -251,6 +252,12 @@ impl NamedParam for Parameters {
                 PARAM_MESSAGE_7_CARRY_0,
                 PARAM_MESSAGE_7_CARRY_1,
                 PARAM_MESSAGE_8_CARRY_0,
+                // Small
+                PARAM_SMALL_MESSAGE_1_CARRY_1,
+                PARAM_SMALL_MESSAGE_2_CARRY_2,
+                PARAM_SMALL_MESSAGE_3_CARRY_3,
+                PARAM_SMALL_MESSAGE_4_CARRY_4,
+                // Wops
                 WOPBS_PARAM_MESSAGE_1_NORM2_2,
                 WOPBS_PARAM_MESSAGE_1_NORM2_4,
                 WOPBS_PARAM_MESSAGE_1_NORM2_6,

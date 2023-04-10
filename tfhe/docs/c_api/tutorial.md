@@ -60,7 +60,7 @@ target_compile_options(${EXECUTABLE_NAME} PRIVATE -Werror)
 
 ### Commented code of a PBS doubling a 2 bits encrypted message using `TFHE-rs C API`.
 
-The steps required to perform the mutiplication by 2 of a 2 bits ciphertext using a PBS are detailed. This is NOT the most efficient way of doing this operation, but it can help to show the management required to run a PBS manually using the C API.
+The steps required to perform the multiplication by 2 of a 2 bits ciphertext using a PBS are detailed. This is NOT the most efficient way of doing this operation, but it can help to show the management required to run a PBS manually using the C API.
 
 WARNING: The following example does not have proper memory management in the error case to make it easier to fit the code on this page.
 
@@ -103,7 +103,7 @@ uint64_t get_max_value_of_accumulator_generator(uint64_t (*accumulator_func)(uin
 
 int main(void)
 {
-    ShortintPBSAccumulator *accumulator = NULL;
+    ShortintPBSLookupTable *accumulator = NULL;
     ShortintClientKey *cks = NULL;
     ShortintServerKey *sks = NULL;
     ShortintParameters *params = NULL;
