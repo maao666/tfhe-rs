@@ -107,7 +107,6 @@ allow_static_const = true
 allow_constexpr = false
 sort_by = "Name"
 
-
 [macro_expansion]
 bitflags = false
 

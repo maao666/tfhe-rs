@@ -11,7 +11,7 @@ jobs:
   start-benchmarks:
     strategy:
       matrix:
-        command: [boolean_bench, shortint_bench, pbs_bench]
+        command: [boolean_bench, shortint_bench, integer_bench, pbs_bench]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Slab repo
@@ -23,11 +23,11 @@ jobs:
 
       - name: Start AWS job in Slab
         shell: bash
-        # TODO: step result must be correlated to HTTP return code.
         run: |
           echo -n '{"command": "${{ matrix.command }}", "git_ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}' > command.json
           SIGNATURE="$(slab/scripts/hmac_calculator.sh command.json '${{ secrets.JOB_SECRET }}')"
           curl -v -k \
+          --fail-with-body \
           -H "Content-Type: application/json" \
           -H "X-Slab-Repository: ${{ github.repository }}" \
           -H "X-Slab-Command: start_aws" \

@@ -9,4 +9,10 @@ target/
 
 **/Cargo.lock
 **/*.bin
+<<<<<<< HEAD
 **/.DS_Store
+=======
+
+# Some of our bench outputs
+/tfhe/benchmarks_parameters
+>>>>>>> a2384e0d1f274cdbaeb9f9cbaf41bbd8c39e29fe

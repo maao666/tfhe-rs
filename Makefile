@@ -6,6 +6,7 @@ TARGET_ARCH_FEATURE:=$(shell ./scripts/get_arch_feature.sh)
 RS_BUILD_TOOLCHAIN:=$(shell \
 	( (echo $(TARGET_ARCH_FEATURE) | grep -q x86) && echo stable) || echo $(RS_CHECK_TOOLCHAIN))
 CARGO_RS_BUILD_TOOLCHAIN:=+$(RS_BUILD_TOOLCHAIN)
+CARGO_PROFILE?=release
 MIN_RUST_VERSION:=1.65
 AVX512_SUPPORT?=OFF
 WASM_RUSTFLAGS:=
@@ -119,54 +120,58 @@ clippy_all_targets:
 clippy_all: clippy clippy_boolean clippy_shortint clippy_integer clippy_all_targets clippy_c_api \
 clippy_js_wasm_api clippy_tasks clippy_core
 
+.PHONY: clippy_fast # Run main clippy targets
+clippy_fast: clippy clippy_all_targets clippy_c_api clippy_js_wasm_api clippy_tasks clippy_core
+
 .PHONY: gen_key_cache # Run the script to generate keys and cache them for shortint tests
 gen_key_cache: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) run --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) run --profile $(CARGO_PROFILE) \
 		--example generates_test_keys \
 		--features=$(TARGET_ARCH_FEATURE),shortint,internal-keycache -p tfhe
 
 .PHONY: build_core # Build core_crypto without experimental features
 build_core: install_rs_build_toolchain install_rs_check_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE) -p tfhe
 	@if [[ "$(AVX512_SUPPORT)" == "ON" ]]; then \
-		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --release \
+		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 			--features=$(TARGET_ARCH_FEATURE),$(AVX512_FEATURE) -p tfhe; \
 	fi
 
 .PHONY: build_core_experimental # Build core_crypto with experimental features
 build_core_experimental: install_rs_build_toolchain install_rs_check_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),experimental -p tfhe
 	@if [[ "$(AVX512_SUPPORT)" == "ON" ]]; then \
-		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --release \
+		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 			--features=$(TARGET_ARCH_FEATURE),experimental,$(AVX512_FEATURE) -p tfhe; \
 	fi
 
 .PHONY: build_boolean # Build with boolean enabled
 build_boolean: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),boolean -p tfhe --all-targets
 
 .PHONY: build_shortint # Build with shortint enabled
 build_shortint: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),shortint -p tfhe --all-targets
 
 .PHONY: build_integer # Build with integer enabled
 build_integer: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),integer -p tfhe --all-targets
 
 .PHONY: build_tfhe_full # Build with boolean, shortint and integer enabled
 build_tfhe_full: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer -p tfhe --all-targets
 
 .PHONY: build_c_api # Build the C API for boolean and shortint
-build_c_api: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) build --release \
-		--features=$(TARGET_ARCH_FEATURE),boolean-c-api,shortint-c-api -p tfhe --all-targets
+build_c_api: install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) build --profile $(CARGO_PROFILE) \
+		--features=$(TARGET_ARCH_FEATURE),boolean-c-api,shortint-c-api,high-level-c-api \
+		-p tfhe
 
 .PHONY: build_web_js_api # Build the js API targeting the web browser
 build_web_js_api: install_rs_build_toolchain
@@ -184,16 +189,16 @@ build_node_js_api: install_rs_build_toolchain
 
 .PHONY: test_core_crypto # Run the tests of the core_crypto module including experimental ones
 test_core_crypto: install_rs_build_toolchain install_rs_check_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),experimental -p tfhe -- core_crypto::
 	@if [[ "$(AVX512_SUPPORT)" == "ON" ]]; then \
-		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) test --release \
+		RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
 			--features=$(TARGET_ARCH_FEATURE),experimental,$(AVX512_FEATURE) -p tfhe -- core_crypto::; \
 	fi
 
 .PHONY: test_boolean # Run the tests of the boolean module
 test_boolean: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),boolean -p tfhe -- boolean::
 
 .PHONY: test_c_api # Run the tests for the C API
@@ -207,7 +212,7 @@ test_shortint_ci: install_rs_build_toolchain install_cargo_nextest
 
 .PHONY: test_shortint # Run all the tests for shortint
 test_shortint: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),shortint,internal-keycache -p tfhe -- shortint::
 
 .PHONY: test_integer_ci # Run the tests for integer ci
@@ -217,17 +222,17 @@ test_integer_ci: install_rs_build_toolchain install_cargo_nextest
 
 .PHONY: test_integer # Run all the tests for integer
 test_integer: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
 		--features=$(TARGET_ARCH_FEATURE),integer,internal-keycache -p tfhe -- integer::
 
-.PHONY: test_typed_api # Run all the tests for typed_api
-test_typed_api: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release \
-		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache -p tfhe -- typed_api::
+.PHONY: test_high_level_api # Run all the tests for high_level_api
+test_high_level_api: install_rs_build_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) \
+		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache -p tfhe -- high_level_api::
 
 .PHONY: test_user_doc # Run tests from the .md documentation
 test_user_doc: install_rs_build_toolchain
-	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --release --doc \
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_BUILD_TOOLCHAIN) test --profile $(CARGO_PROFILE) --doc \
 		--features=$(TARGET_ARCH_FEATURE),boolean,shortint,integer,internal-keycache -p tfhe \
 		-- test_user_docs::
 
@@ -279,6 +284,12 @@ test_nodejs_wasm_api: build_node_js_api
 no_tfhe_typo:
 	@./scripts/no_tfhe_typo.sh
 
+.PHONY: bench_integer # Run benchmarks for integer
+bench_integer: install_rs_check_toolchain
+	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) bench \
+	--bench integer-bench \
+	--features=$(TARGET_ARCH_FEATURE),integer,internal-keycache,$(AVX512_FEATURE) -p tfhe
+
 .PHONY: bench_shortint # Run benchmarks for shortint
 bench_shortint: install_rs_check_toolchain
 	RUSTFLAGS="$(RUSTFLAGS)" cargo $(CARGO_RS_CHECK_TOOLCHAIN) bench \
@@ -311,6 +322,9 @@ measure_boolean_key_sizes: install_rs_check_toolchain
 
 .PHONY: pcc # pcc stands for pre commit checks
 pcc: no_tfhe_typo check_fmt doc clippy_all check_compile_tests
+
+.PHONY: fpcc # pcc stands for pre commit checks, the f stands for fast
+fpcc: no_tfhe_typo check_fmt doc clippy_fast check_compile_tests
 
 .PHONY: conformance # Automatically fix problems that can be fixed
 conformance: fmt
