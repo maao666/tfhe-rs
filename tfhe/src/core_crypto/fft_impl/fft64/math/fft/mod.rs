@@ -18,6 +18,8 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use rug::Complex;
 
+use rustfft::{FftPlanner};
+
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod x86;
 
@@ -475,7 +477,18 @@ impl<'a> FftView<'a> {
         debug_assert_eq!(n, 2 * fourier.len());
         let (standard_re, standard_im) = standard.split_at(n / 2);
         conv_fn(fourier, standard_re, standard_im, self.twisties);
-        self.plan.fwd(fourier, stack);
+        // ================== NOTE ==================
+        // Here `fourier` is &mut [num_complex::Complex<f64>]
+        // with an example size of 1024
+        // `stack` is used only for temp memory
+        // So what have to be done is to perform in-place FFT on `fourier`
+        //self.plan.fwd(fourier, stack);
+        // ================= RustFFT =================
+        let mut planner = FftPlanner::new();
+        let fft = planner.plan_fft_forward(n / 2);
+
+        //let mut buffer = vec![Complex { re: 0.0f64, im: 0.1f64 }; 1024];
+        fft.process(fourier);
         FourierPolynomialMutView { data: fourier }
     }
 
